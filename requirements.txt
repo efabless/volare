@@ -1,0 +1,7 @@
+rich>=10,<11
+click>=7
+pyyaml>=5,<6
+
+# maybe
+wheel
+click-default-group>=1,<2
