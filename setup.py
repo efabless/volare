@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages
-from volare.__init__ import __version__
+from volare.__init__ import version
 
 requirements = open("requirements.txt").read().strip().split("\n")
 

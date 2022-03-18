@@ -14,6 +14,7 @@
 # limitations under the License.
 import os
 import sys
+import json
 import pathlib
 
 import rich
@@ -23,6 +24,10 @@ from click_default_group import DefaultGroup
 from .git_multi_clone import mkdirp
 from .click_option import opt_pdk_root
 
+def get_installed_list(pdk_root):
+    version_dir = os.path.join(pdk_root, "volare", "versions")
+    mkdirp(version_dir)
+    return os.listdir(version_dir)
 
 @click.group(cls=DefaultGroup, default="output", default_if_no_args=True)
 def manage():
@@ -43,6 +48,7 @@ def output(pdk_root):
         console = rich.console.Console()
         if file_content == "":
             console.log("No PDK is currently enabled.")
+            console.print(f"Installed PDKs: {get_installed_list(pdk_root)}")
             exit(1)
         else:
             console.log(f"Version {file_content} is currently enabled.")
@@ -55,6 +61,16 @@ def output(pdk_root):
 
 manage.add_command(output)
 
+@click.command("list")
+@opt_pdk_root
+def list_cmd(pdk_root):
+    console = rich.console.Console()
+    if sys.stdout.isatty():
+        console.print(f"Current installed versions: {get_installed_list(pdk_root)}")
+    else:
+        print(json.dumps(get_installed_list(pdk_root)))
+
+manage.add_command(list_cmd)
 
 @click.command()
 @opt_pdk_root

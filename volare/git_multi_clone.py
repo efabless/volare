@@ -71,7 +71,7 @@ class Repository(object):
 
         ro_rx = re.compile(r"Receiving objects:\s*(\d+)%")
 
-        # Fuck this stupid snake language
+        # Python Moment
         buffer = ""
         while True:
             bytes_read = process.stderr.read(1)
@@ -118,7 +118,7 @@ class Repository(object):
 
         ro_rx = re.compile(r"Receiving objects:\s*(\d+)%")
 
-        # Python Moment
+        # Python Moment #2
         buffer = ""
         while True:
             bytes_read = process.stderr.read(1)
@@ -184,7 +184,7 @@ class Repository(object):
 
         ro_rx = re.compile(r"Receiving objects:\s*(\d+)%")
 
-        # Python Moment #2
+        # Python Moment #3
         buffer = ""
         while True:
             bytes_read = process.stderr.read(1)
