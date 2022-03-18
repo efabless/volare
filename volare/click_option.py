@@ -12,21 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+from functools import partial
+
 import click
 
-from click_default_group import DefaultGroup
-from .build import build
-from .manage import manage
+opt = partial(click.option, show_default=True)
 
 
-@click.group(cls=DefaultGroup, default="manage", default_if_no_args=True)
-def cli():
-    pass
-
-
-cli.add_command(build)
-cli.add_command(manage)
-
-
-if __name__ == "__main__":
-    cli()
+def opt_pdk_root(function):
+    function = click.option(
+        "--pdk-root",
+        required=(os.getenv("PDK_ROOT") is None),
+        default=os.getenv("PDK_ROOT"),
+        help="Path to the PDK root [required if environment variable PDK_ROOT is not set]",
+    )(function)
+    return function

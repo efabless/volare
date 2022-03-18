@@ -21,6 +21,10 @@ import subprocess
 from rich.progress import Progress
 
 
+def mkdirp(path):
+    return pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+
+
 class Repository(object):
     @classmethod
     def from_path(Self, path):
@@ -205,7 +209,7 @@ class GitMultiClone(object):
     def __init__(self, folder, progress):
         super().__init__()
         self.folder = os.path.abspath(folder)
-        pathlib.Path(self.folder).mkdir(parents=True, exist_ok=True)
+        mkdirp(self.folder)
         self.progress = progress
 
     def clone(

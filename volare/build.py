@@ -17,16 +17,15 @@ import re
 import venv
 import uuid
 import shutil
-import pathlib
 import subprocess
-from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
 import rich
 import click
 from rich.progress import Progress
 
-from .git_multi_clone import GitMultiClone, Repository
+from .git_multi_clone import GitMultiClone, Repository, mkdirp
+from .click_option import opt, opt_pdk_root
 
 
 class RepoMetadata(object):
@@ -53,10 +52,6 @@ RepoMetadata.by_name = {
         "master",
     ),
 }
-
-
-def mkdirp(path):
-    return pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
 
 def get_open_pdks(version, build_directory, jobs=1):
@@ -332,7 +327,10 @@ def install_sky130(build_directory, versions_directory, version):
     console = rich.console.Console()
     with console.status("Adding build to list of installed versions..."):
         version_directory = os.path.join(versions_directory, version)
-        if os.path.exists(versions_directory) and len(os.listdir(versions_directory)) != 0:
+        if (
+            os.path.exists(version_directory)
+            and len(os.listdir(version_directory)) != 0
+        ):
             backup_path = version_directory
             it = 0
             while os.path.exists(backup_path) and len(os.listdir(backup_path)) != 0:
@@ -349,38 +347,34 @@ def install_sky130(build_directory, versions_directory, version):
         sky130A = os.path.join(build_directory, "sky130A")
         sky130B = os.path.join(build_directory, "sky130B")
 
-        shutil.copy(sky130A, versions_directory)
-        shutil.copy(sky130B, versions_directory)
+        sky130A_installed = os.path.join(version_directory, "sky130A")
+        sky130B_installed = os.path.join(version_directory, "sky130B")
+
+        shutil.copytree(sky130A, sky130A_installed)
+        shutil.copytree(sky130B, sky130B_installed)
 
     console.log("Done.")
 
 
 # ---
 
-click.option = partial(click.option, show_default=True)
-
 
 @click.command()
-@click.option(
+@opt_pdk_root
+@opt(
     "-l",
     "--include-libraries",
     default="sky130_fd_sc_hd|sky130_fd_sc_hvl|sky130_fd_io|sky130_fd_pr",
     help="Regular expression for libraries to include. Use '.+' to include all of them.",
 )
-@click.option(
+@opt(
     "-j",
     "--jobs",
     default=1,
     help="Specifies the number of commands to run simultaneously.",
 )
-@click.option(
-    "--pdk-root",
-    required=(os.getenv("PDK_ROOT") is None),
-    default=os.getenv("PDK_ROOT"),
-    help="Path to the PDK root [required if environment variable PDK_ROOT is not set]",
-)
-@click.option("--sram/--no-sram", default=True, help="Enable or disable sram")
-@click.option(
+@opt("--sram/--no-sram", default=True, help="Enable or disable sram")
+@opt(
     "--clear-build-artifacts/--keep-build-artifacts",
     default=False,
     help="Whether or not to remove the build artifacts. Keeping the build artifacts is useful when testing.",
