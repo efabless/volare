@@ -3,3 +3,5 @@ pdk/
 __pycache__
 venv/
 logs/
+dist/
+*.egg-info/

@@ -6,7 +6,7 @@ requirements = open("requirements.txt").read().strip().split("\n")
 setup(
     name="volare",
     packages=find_packages(),
-    version=__version__,
+    version=version,
     description="A sky130 PDK builder/version manager",
     long_description=open("Readme.md").read(),
     long_description_content_type="text/markdown",
@@ -19,6 +19,6 @@ setup(
         "Operating System :: POSIX :: Linux",
         "Operating System :: MacOS :: MacOS X",
     ],
-    entry_points={"console_scripts": ["volare = volare.__main__:main"]},
+    entry_points={"console_scripts": ["volare = volare.__main__:cli"]},
     python_requires=">3.6",
 )

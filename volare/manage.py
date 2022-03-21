@@ -31,12 +31,14 @@ def get_installed_list(pdk_root):
 
 @click.group(cls=DefaultGroup, default="output", default_if_no_args=True)
 def manage():
+    """Allows you to list and enable installed PDKs. (default)"""
     pass
 
 
 @click.command()
 @opt_pdk_root
 def output(pdk_root):
+    """Outputs the currently installed PDK version."""
     current_file = os.path.join(pdk_root, "volare", "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
@@ -64,6 +66,7 @@ manage.add_command(output)
 @click.command("list")
 @opt_pdk_root
 def list_cmd(pdk_root):
+    """Lists installed PDK versions."""
     console = rich.console.Console()
     if sys.stdout.isatty():
         console.print(f"Current installed versions: {get_installed_list(pdk_root)}")
@@ -74,15 +77,57 @@ manage.add_command(list_cmd)
 
 @click.command()
 @opt_pdk_root
-@click.argument("version")
-def enable(pdk_root, version):
+@click.option(
+    "-f",
+    "--metadata-file",
+    "tool_metadata_file_path",
+    default=None,
+    help="Explicitly define a tool metadata file instead of searching for a metadata file",
+)
+@click.argument("version", required=False)
+def enable(pdk_root, tool_metadata_file_path, version):
+    """
+    Activates a given PDK version.
+
+    Parameters: <version> (Optional)
+
+    If a version is not given, and you run this in the top level directory of
+    tools with a tool_metadata.yml file, for example OpenLane or DFFRAM,
+    the appropriate version will be enabled automatically.
+    """
+    console = rich.console.Console()
+
+    if version is None:
+        import yaml
+
+        if tool_metadata_file_path is None:
+            tool_metadata_file_path = os.path.join(".", "tool_metadata.yml")
+            if not os.path.isfile(tool_metadata_file_path):
+                tool_metadata_file_path = os.path.join(
+                    ".", "dependencies", "tool_metadata.yml"
+                )
+                if not os.path.isfile(tool_metadata_file_path):
+                    print(
+                        f"Any of ./tool_metadata.yml or ./dependencies/tool_metadata.yml not found. You'll need to specify the file path or the commits explicitly."
+                    )
+                    exit(os.EX_USAGE)
+        
+        tool_metadata = yaml.safe_load(open(tool_metadata_file_path).read())
+
+        open_pdks_list = [
+            tool for tool in tool_metadata if tool["name"] == "open_pdks"
+        ]
+        
+        if len(open_pdks_list) < 1:
+            console.log("No entry for open_pdks found in tool_metadata.yml")
+
+        version = open_pdks_list[0]["commit"]
+        
     current_file = os.path.join(pdk_root, "volare", "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
 
     version_dir = os.path.join(pdk_root, "volare", "versions", version)
-
-    console = rich.console.Console()
 
     variants = ["sky130A", "sky130B"]
     version_paths = [os.path.join(version_dir, variant) for variant in variants]
@@ -110,6 +155,8 @@ def enable(pdk_root, version):
 
         with open(current_file, "w") as f:
             f.write(version)
+    
+    console.log(f"PDK version {version} enabled.")
 
 
 manage.add_command(enable)
