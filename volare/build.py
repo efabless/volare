@@ -25,7 +25,7 @@ import click
 from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone, Repository, mkdirp
-from .click_option import opt, opt_pdk_root
+from .common import opt, opt_pdk_root, check_version
 
 
 class RepoMetadata(object):
@@ -38,7 +38,7 @@ class RepoMetadata(object):
 RepoMetadata.by_name = {
     "open_pdks": RepoMetadata(
         "https://github.com/RTimothyEdwards/open_pdks",
-        "4040b7ca03d03bbbefbc8b1d0f7016cc04275c24",
+        "34eeb2743e99d44a21c2cedd467675a2e0f3bb91",
         "master",
     ),
     "sky130": RepoMetadata(
@@ -48,7 +48,7 @@ RepoMetadata.by_name = {
     ),
     "magic": RepoMetadata(
         "https://github.com/RTimothyEdwards/magic",
-        "083c0c10e9a090a00e266575d81d487e11d2cb98",
+        "d98645afc1498a41db7aff4b2e100f27e0b0bd9b",
         "master",
     ),
 }
@@ -379,13 +379,26 @@ def install_sky130(build_directory, versions_directory, version):
     default=False,
     help="Whether or not to remove the build artifacts. Keeping the build artifacts is useful when testing.",
 )
-@click.argument("version")
-def build(include_libraries, jobs, sram, pdk_root, clear_build_artifacts, version):
+@click.option(
+    "-f",
+    "--metadata-file",
+    "tool_metadata_file_path",
+    default=None,
+    help="Explicitly define a tool metadata file instead of searching for a metadata file",
+)
+@click.argument("version", required=False)
+def build(include_libraries, jobs, sram, pdk_root, clear_build_artifacts, tool_metadata_file_path, version):
     """
     Builds the sky130 PDK using open_pdks.
 
-    Parameters: <version> The version of open_pdks to use
+    Parameters: <version> (Optional)
+
+    If a version is not given, and you run this in the top level directory of
+    tools with a tool_metadata.yml file, for example OpenLane or DFFRAM,
+    the appropriate version will be enabled automatically.
     """
+
+    version = check_version(version, tool_metadata_file_path, rich.console.Console())
 
     build_directory = os.path.join(pdk_root, "volare", "build", version)
     versions_directory = os.path.join(pdk_root, "volare", "versions")

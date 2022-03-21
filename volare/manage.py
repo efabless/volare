@@ -22,12 +22,14 @@ import click
 from click_default_group import DefaultGroup
 
 from .git_multi_clone import mkdirp
-from .click_option import opt_pdk_root
+from .common import opt_pdk_root, check_version
+
 
 def get_installed_list(pdk_root):
     version_dir = os.path.join(pdk_root, "volare", "versions")
     mkdirp(version_dir)
     return os.listdir(version_dir)
+
 
 @click.group(cls=DefaultGroup, default="output", default_if_no_args=True)
 def manage():
@@ -63,6 +65,7 @@ def output(pdk_root):
 
 manage.add_command(output)
 
+
 @click.command("list")
 @opt_pdk_root
 def list_cmd(pdk_root):
@@ -73,7 +76,9 @@ def list_cmd(pdk_root):
     else:
         print(json.dumps(get_installed_list(pdk_root)))
 
+
 manage.add_command(list_cmd)
+
 
 @click.command()
 @opt_pdk_root
@@ -97,32 +102,8 @@ def enable(pdk_root, tool_metadata_file_path, version):
     """
     console = rich.console.Console()
 
-    if version is None:
-        import yaml
+    version = check_version(version, tool_metadata_file_path, console)
 
-        if tool_metadata_file_path is None:
-            tool_metadata_file_path = os.path.join(".", "tool_metadata.yml")
-            if not os.path.isfile(tool_metadata_file_path):
-                tool_metadata_file_path = os.path.join(
-                    ".", "dependencies", "tool_metadata.yml"
-                )
-                if not os.path.isfile(tool_metadata_file_path):
-                    print(
-                        f"Any of ./tool_metadata.yml or ./dependencies/tool_metadata.yml not found. You'll need to specify the file path or the commits explicitly."
-                    )
-                    exit(os.EX_USAGE)
-        
-        tool_metadata = yaml.safe_load(open(tool_metadata_file_path).read())
-
-        open_pdks_list = [
-            tool for tool in tool_metadata if tool["name"] == "open_pdks"
-        ]
-        
-        if len(open_pdks_list) < 1:
-            console.log("No entry for open_pdks found in tool_metadata.yml")
-
-        version = open_pdks_list[0]["commit"]
-        
     current_file = os.path.join(pdk_root, "volare", "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
@@ -155,7 +136,7 @@ def enable(pdk_root, tool_metadata_file_path, version):
 
         with open(current_file, "w") as f:
             f.write(version)
-    
+
     console.log(f"PDK version {version} enabled.")
 
 
