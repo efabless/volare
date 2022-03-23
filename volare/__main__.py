@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import click
-
 from click_default_group import DefaultGroup
-from .build import build
+
+from .build import build, push
 from .manage import manage
 
 
@@ -26,6 +26,7 @@ def cli():
 
 cli.add_command(build)
 cli.add_command(manage)
+cli.add_command(push)
 
 
 if __name__ == "__main__":

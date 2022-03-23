@@ -18,17 +18,34 @@ import json
 import pathlib
 
 import rich
+import rich.tree
 import click
 from click_default_group import DefaultGroup
 
 from .git_multi_clone import mkdirp
-from .common import opt_pdk_root, check_version
+from .common import opt_pdk_root, check_version, get_versions_dir, get_version_dir
 
 
 def get_installed_list(pdk_root):
-    version_dir = os.path.join(pdk_root, "volare", "versions")
-    mkdirp(version_dir)
-    return os.listdir(version_dir)
+    versions_dir = get_versions_dir(pdk_root)
+    mkdirp(versions_dir)
+    return os.listdir(versions_dir)
+
+
+def print_installed_list(pdk_root, version, console):
+    installed_list = get_installed_list(pdk_root)
+    versions_dir = get_versions_dir(pdk_root)
+    if len(installed_list) == 0:
+        console.print("[red]No PDKs installed.")
+        return
+
+    tree = rich.tree.Tree(f"{versions_dir}")
+    for installed in installed_list:
+        if installed == version:
+            tree.add(f"[green][bold]{installed} (enabled)")
+        else:
+            tree.add(installed)
+    console.print(tree)
 
 
 @click.group(cls=DefaultGroup, default="output", default_if_no_args=True)
@@ -50,12 +67,7 @@ def output(pdk_root):
 
     if sys.stdout.isatty():
         console = rich.console.Console()
-        if file_content == "":
-            console.log("No PDK is currently enabled.")
-            console.print(f"Installed PDKs: {get_installed_list(pdk_root)}")
-            exit(1)
-        else:
-            console.log(f"Version {file_content} is currently enabled.")
+        print_installed_list(pdk_root, file_content, console)
     else:
         if file_content == "":
             exit(1)
@@ -69,15 +81,26 @@ manage.add_command(output)
 @click.command("list")
 @opt_pdk_root
 def list_cmd(pdk_root):
-    """Lists installed PDK versions."""
-    console = rich.console.Console()
-    if sys.stdout.isatty():
-        console.print(f"Current installed versions: {get_installed_list(pdk_root)}")
-    else:
-        print(json.dumps(get_installed_list(pdk_root)))
+    """Lists installed PDK versions in a parsable format."""
+    print(json.dumps(get_installed_list(pdk_root)))
 
 
 manage.add_command(list_cmd)
+
+
+@click.command("path")
+@opt_pdk_root
+@click.argument("version")
+def path_cmd(pdk_root, version):
+    """Prints the path of a specific pdk version installation."""
+    path_of_version = os.path.join(get_versions_dir(pdk_root), version)
+    if sys.stdout.isatty():
+        print(path_of_version)
+    else:
+        print(path_of_version, end="")
+
+
+manage.add_command(path_cmd)
 
 
 @click.command()
@@ -108,7 +131,7 @@ def enable(pdk_root, tool_metadata_file_path, version):
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
 
-    version_dir = os.path.join(pdk_root, "volare", "versions", version)
+    version_dir = get_version_dir(pdk_root, version)
 
     variants = ["sky130A", "sky130B"]
     version_paths = [os.path.join(version_dir, variant) for variant in variants]
@@ -116,17 +139,19 @@ def enable(pdk_root, tool_metadata_file_path, version):
 
     if not os.path.exists(version_dir):
         # TODO: Enable a pre-built version to be downloaded from the internet, if applicable
-        console.log(f"Version {version} is not downloaded, and thus cannot be enabled.")
+        console.print(
+            f"[red]Version {version} is not downloaded, and thus cannot be enabled."
+        )
         exit(1)
 
-    with console.status(f"Enabling version {version}..."):
+    with console.status(f"Enabling version {version}…"):
         for path in final_paths:
             if os.path.exists(path):
                 if os.path.islink(path):
                     os.unlink(path)
                 else:
-                    console.log(
-                        f"Error: {path} exists, and not as a symlink. Please manually remove it before continuing."
+                    console.print(
+                        f"[red]Error: {path} exists, and not as a symlink. Please manually remove it before continuing."
                     )
                     exit(1)
 
@@ -137,7 +162,7 @@ def enable(pdk_root, tool_metadata_file_path, version):
         with open(current_file, "w") as f:
             f.write(version)
 
-    console.log(f"PDK version {version} enabled.")
+    console.print(f"PDK version {version} enabled.")
 
 
 manage.add_command(enable)

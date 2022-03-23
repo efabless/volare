@@ -36,7 +36,7 @@ def opt_pdk_root(function):
 def check_version(
     version: Optional[str],
     tool_metadata_file_path: Optional[str],
-    console: Optional[rich.console.Console] = None
+    console: Optional[rich.console.Console] = None,
 ) -> str:
     """
     Takes an optional version and tool_metadata_file_path.
@@ -89,3 +89,11 @@ def check_version(
     pr(f"Found version {version} in {tool_metadata_file_path}.")
 
     return version
+
+
+def get_versions_dir(pdk_root: str) -> str:
+    return os.path.join(pdk_root, "volare", "versions")
+
+
+def get_version_dir(pdk_root: str, version: str) -> str:
+    return os.path.join(get_versions_dir(pdk_root), version)

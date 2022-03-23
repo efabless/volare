@@ -61,7 +61,7 @@ class Repository(object):
         except FileNotFoundError:
             pass
 
-        callback(0, f"Cloning {self.name}...")
+        callback(0, f"Cloning {self.name}…")
 
         process = subprocess.Popen(
             ["git", "clone", "--progress", self.url, self.path],
@@ -114,7 +114,7 @@ class Repository(object):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        callback(0, f"Updating {self.name}...")
+        callback(0, f"Updating {self.name}…")
 
         ro_rx = re.compile(r"Receiving objects:\s*(\d+)%")
 
@@ -229,7 +229,7 @@ class GitMultiClone(object):
 
     def clone_submodule(self, repo: Repository, submodule: str):
         current_task = self.progress.add_task(
-            f"Updating submodule {submodule}...", total=100
+            f"Updating submodule {submodule}…", total=100
         )
         repo.init_submodule_if_not_exist(
             submodule, lambda x: self.progress.update(current_task, completed=x)

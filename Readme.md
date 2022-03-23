@@ -14,14 +14,22 @@ It only works with portable versions of the sky130 open_pdk builds.
 * Docker 19+
 
 # Installation
-Just run this:
-
 ```sh
-python3 -m pip install git+https://github.com/efabless/volare
+python3 -m pip install volare
 ```
 
 # Usage
-TBD
+**tl;dr invoke `volare enable` in your OpenLane repository**
+
+In its current inception, volare supports builds of the sky130** PDK using [Open_PDKs](https://github.com/RTimothyEdwards/), including the following libraries:
+* sky130_fd_io
+* sky130_fd_pr
+* sky130_fd_sc_hd
+* sky130_fd_sc_hvl
+* sky130 sram modules
+
+(to be continued)
+
 
 # License
 The Apache License, version 2.0. See 'License'.

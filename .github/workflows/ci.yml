@@ -1,0 +1,22 @@
+name: CI
+
+# Events that trigger workflow
+on:
+  push:
+    branches:
+    pull_requests:
+
+jobs:
+  lint_python:
+    name: Lint Python Code
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v2
+      - name: Install Linters
+        run: python3 -m pip install -r ./requirements_lint.txt
+      - name: Ensure Black Formatting
+        run: black --check .
+      - name: Lint with Flake8
+        run: flake8 .
+
