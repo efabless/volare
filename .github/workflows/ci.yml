@@ -19,4 +19,11 @@ jobs:
         run: black --check .
       - name: Lint with Flake8
         run: flake8 .
+  # push_to_pypi:
+  #   - name: Check out Git repository
+  #     uses: actions/checkout@v2
+  #   - name: Get Tag
+  #     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+  #     run: |
+  #       echo TAG="$(ruby -e "print '$GITHUB_REF'.split('/')[2]")" >> $GITHUB_ENV
 

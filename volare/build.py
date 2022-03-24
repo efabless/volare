@@ -452,7 +452,7 @@ def push(owner, repository, token, pdk_root, version):
     tarball_directory = f"/tmp/{uuid.uuid4()}"
     mkdirp(tarball_directory)
 
-    tarball_path = os.path.join(tarball_directory, f"{version}.tar.gz")
+    tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
 
     with Progress() as progress:
         glob_string = os.path.join(version_directory, "**/*")

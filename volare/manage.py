@@ -12,18 +12,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from inspect import getmembers
 import os
 import sys
 import json
+import uuid
+import tarfile
 import pathlib
+import requests
 
 import rich
 import rich.tree
 import click
+import rich.progress
 from click_default_group import DefaultGroup
 
 from .git_multi_clone import mkdirp
-from .common import opt_pdk_root, check_version, get_versions_dir, get_version_dir
+from .common import (
+    get_link_of,
+    opt_pdk_root,
+    check_version,
+    get_versions_dir,
+    get_version_dir,
+)
 
 
 def get_installed_list(pdk_root):
@@ -90,14 +101,13 @@ manage.add_command(list_cmd)
 
 @click.command("path")
 @opt_pdk_root
-@click.argument("version")
+@click.argument("version", required=False)
 def path_cmd(pdk_root, version):
     """Prints the path of a specific pdk version installation."""
-    path_of_version = os.path.join(get_versions_dir(pdk_root), version)
-    if sys.stdout.isatty():
-        print(path_of_version)
-    else:
-        print(path_of_version, end="")
+    path_to_print = pdk_root
+    if version is not None:
+        path_to_print = os.path.join(get_versions_dir(pdk_root), version)
+    print(path_to_print, end="")
 
 
 manage.add_command(path_cmd)
@@ -131,18 +141,49 @@ def enable(pdk_root, tool_metadata_file_path, version):
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
 
-    version_dir = get_version_dir(pdk_root, version)
+    version_directory = get_version_dir(pdk_root, version)
 
     variants = ["sky130A", "sky130B"]
-    version_paths = [os.path.join(version_dir, variant) for variant in variants]
+    version_paths = [os.path.join(version_directory, variant) for variant in variants]
     final_paths = [os.path.join(pdk_root, variant) for variant in variants]
 
-    if not os.path.exists(version_dir):
-        # TODO: Enable a pre-built version to be downloaded from the internet, if applicable
-        console.print(
-            f"[red]Version {version} is not downloaded, and thus cannot be enabled."
-        )
-        exit(1)
+    if not os.path.exists(version_directory):
+        link = get_link_of(version)
+        status = requests.head(link).status_code
+        if status == 404:
+            console.print(
+                f"[red]Version {version} not found either remotely or locally.\nTry volare build {version}."
+            )
+            exit(1)
+
+        tarball_directory = f"/tmp/{uuid.uuid4()}"
+        mkdirp(tarball_directory)
+
+        tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
+
+        with requests.get(link, stream=True) as r:
+            with rich.progress.Progress() as p:
+                task = p.add_task(
+                    f"Downloading {version}.tar.xz…",
+                    total=int(r.headers["Content-length"]),
+                )
+                r.raise_for_status()
+                with open(tarball_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        p.advance(task, advance=len(chunk))
+                        f.write(chunk)
+
+                task = p.add_task("Unpacking…")
+                with tarfile.open(tarball_path, mode="r:*") as tf:
+                    p.update(task, total=len(tf.getmembers()))
+                    for i, file in enumerate(tf.getmembers()):
+                        p.update(task, completed=i + 1)
+                        final_path = os.path.join(version_directory, file.name)
+                        final_dir = os.path.dirname(final_path)
+                        mkdirp(final_dir)
+                        with tf.extractfile(file) as io:
+                            with open(final_path, "wb") as f:
+                                f.write(io.read())
 
     with console.status(f"Enabling version {version}…"):
         for path in final_paths:

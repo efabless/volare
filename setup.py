@@ -1,7 +1,15 @@
 from setuptools import setup, find_packages
-from volare.__init__ import version
+import subprocess
 
 requirements = open("requirements.txt").read().strip().split("\n")
+
+version = "UNKNOWN"
+try:
+    version = (
+        subprocess.check_output(["git", "describe", "--tags"]).decode("utf8").strip()
+    )
+except subprocess.CalledProcessError:
+    pass
 
 setup(
     name="volare",
