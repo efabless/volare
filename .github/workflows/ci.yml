@@ -39,7 +39,7 @@ jobs:
       run: |
         python3 -m build --sdist --wheel --outdir dist/ .
     - name: Publish (if tagged)
-      if: ${{ env.TAGGED == "1" }}
+      if: ${{ env.TAGGED == '1' }}
       uses: pypa/gh-action-pypi-publish@master
       with:
         password: ${{ secrets.PYPI_API_TOKEN }}
