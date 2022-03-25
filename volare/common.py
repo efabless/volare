@@ -28,7 +28,7 @@ def opt_pdk_root(function: Callable):
     function = click.option(
         "--pdk-root",
         required=False,
-        default=os.getenv("PDK_ROOT") or os.path.expanduser("~/pdks"),
+        default=os.getenv("PDK_ROOT") or os.path.expanduser("~/.volare"),
         help="Path to the PDK root",
         show_default=True,
     )(function)
