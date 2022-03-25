@@ -3,8 +3,7 @@ name: CI
 # Events that trigger workflow
 on:
   push:
-    branches:
-    pull_requests:
+  pull_request:
 
 jobs:
   lint_python:
@@ -14,16 +13,33 @@ jobs:
       - name: Check out Git repository
         uses: actions/checkout@v2
       - name: Install Linters
-        run: python3 -m pip install -r ./requirements_lint.txt
-      - name: Ensure Black Formatting
-        run: black --check .
-      - name: Lint with Flake8
-        run: flake8 .
-  # push_to_pypi:
-  #   - name: Check out Git repository
-  #     uses: actions/checkout@v2
-  #   - name: Get Tag
-  #     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
-  #     run: |
-  #       echo TAG="$(ruby -e "print '$GITHUB_REF'.split('/')[2]")" >> $GITHUB_ENV
-
+        run: make venv-dev
+      - name: Lint
+        run: make lint
+  push_to_pypi:
+    name: Build (and push, if applicable)
+    runs-on: ubuntu-20.04
+    needs: lint_python
+    steps:
+    - name: Check out Git repository
+      uses: actions/checkout@v2
+    - name: Get Tag
+      if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+      run: |
+        echo VOLARE_BUILD_TAG="$(ruby -e "print '$GITHUB_REF'.split('/')[2]")" >> $GITHUB_ENV
+        echo TAGGED=1 >> $GITHUB_ENV
+    - name: Set Up Python 3.6
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.6
+    - name: Install Build Dependencies
+      run: |
+        python3 -m pip install build
+    - name: Build
+      run: |
+        python3 -m build --sdist --wheel --outdir dist/ .
+    - name: Publish (if tagged)
+      if: ${{ env.TAGGED == "1" }}
+      uses: pypa/gh-action-pypi-publish@master
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}

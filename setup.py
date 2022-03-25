@@ -1,9 +1,10 @@
-from setuptools import setup, find_packages
+import os
 import subprocess
+from setuptools import setup, find_packages
 
 requirements = open("requirements.txt").read().strip().split("\n")
 
-version = "UNKNOWN"
+version = os.getenv("VOLARE_BUILD_TAG") or "UNKNOWN"
 try:
     version = (
         subprocess.check_output(["git", "describe", "--tags"]).decode("utf8").strip()
