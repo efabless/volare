@@ -27,7 +27,7 @@ import click
 from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone, Repository, mkdirp
-from .common import opt, opt_pdk_root, check_version, get_version_dir
+from .common import opt, opt_pdk_root, check_version, get_version_dir, get_volare_dir
 
 
 class RepoMetadata(object):
@@ -412,7 +412,7 @@ def build(
 
     version = check_version(version, tool_metadata_file_path, rich.console.Console())
 
-    build_directory = os.path.join(pdk_root, "volare", "build", version)
+    build_directory = os.path.join(get_volare_dir(pdk_root), "build", version)
     get_open_pdks(version, build_directory, jobs)
     get_sky130(include_libraries, build_directory, jobs)
     build_sky130_timing(build_directory, jobs)
@@ -446,8 +446,7 @@ def push(owner, repository, token, pdk_root, version):
 
     console = rich.console.Console()
 
-    versions_directory = os.path.join(pdk_root, "volare", "versions")
-    version_directory = os.path.join(versions_directory, version)
+    version_directory = get_version_dir(pdk_root, version)
 
     tarball_directory = f"/tmp/{uuid.uuid4()}"
     mkdirp(tarball_directory)

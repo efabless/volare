@@ -33,6 +33,7 @@ from .common import (
     check_version,
     get_versions_dir,
     get_version_dir,
+    get_volare_dir,
 )
 
 
@@ -68,7 +69,7 @@ def manage():
 @opt_pdk_root
 def output(pdk_root):
     """Outputs the currently installed PDK version."""
-    current_file = os.path.join(pdk_root, "volare", "current")
+    current_file = os.path.join(get_volare_dir(pdk_root), "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
     pathlib.Path(current_file).touch(exist_ok=True)
@@ -136,7 +137,7 @@ def enable(pdk_root, tool_metadata_file_path, version):
 
     version = check_version(version, tool_metadata_file_path, console)
 
-    current_file = os.path.join(pdk_root, "volare", "current")
+    current_file = os.path.join(get_volare_dir(pdk_root), "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
 

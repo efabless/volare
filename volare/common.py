@@ -93,8 +93,12 @@ def check_version(
     return version
 
 
+def get_volare_dir(pdk_root: str) -> str:
+    return os.path.join(pdk_root, "volare", "sky130")
+
+
 def get_versions_dir(pdk_root: str) -> str:
-    return os.path.join(pdk_root, "volare", "versions")
+    return os.path.join(get_volare_dir(pdk_root), "versions")
 
 
 def get_version_dir(pdk_root: str, version: str) -> str:
