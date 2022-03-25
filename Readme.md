@@ -10,13 +10,11 @@ It only works with portable versions of the sky130 open_pdk builds.
 
 # Installation
 ```sh
-python3 -m pip install git+https://github.com/efabless/volare
+python3 -m pip install --upgrade volare
 ```
 
-We're looking to make it available in the primary PIP repositories as soon as CI is finished.
-
 # Usage
-Volare requires a so-called **PDK Root**. This PDK root can be anywhere on your computer, but by default it's the folder `pdks` in your home directory. If you have the variable `PDK_ROOT` set, volare will use that instead. You can also manually override both values by supplying the `--pdk-root` commandline argument.
+Volare requires a so-called **PDK Root**. This PDK root can be anywhere on your computer, but by default it's the folder `~/.volare` in your home directory. If you have the variable `PDK_ROOT` set, volare will use that instead. You can also manually override both values by supplying the `--pdk-root` commandline argument.
 
 ## Downloading and Enabling PDKs
 In its current inception, volare supports builds of the sky130 PDK using [Open_PDKs](https://github.com/RTimothyEdwards/), including the following libraries:
