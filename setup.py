@@ -1,7 +1,17 @@
+import os
+import sys
+import subprocess
 from setuptools import setup, find_packages
-from volare.__init__ import version
 
 requirements = open("requirements.txt").read().strip().split("\n")
+
+try:
+    version = (
+        subprocess.check_output(["git", "describe", "--tags"]).decode("utf8").strip()
+    )
+except subprocess.CalledProcessError:
+    print("Volare must be built with a full Git clone.", file=sys.stderr)
+    exit(os.EX_DATAERR)
 
 setup(
     name="volare",

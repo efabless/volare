@@ -14,9 +14,11 @@
 # limitations under the License.
 import os
 import re
+import glob
 import venv
 import uuid
 import shutil
+import tarfile
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
@@ -25,7 +27,7 @@ import click
 from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone, Repository, mkdirp
-from .common import opt, opt_pdk_root, check_version
+from .common import opt, opt_pdk_root, check_version, get_version_dir, get_volare_dir
 
 
 class RepoMetadata(object):
@@ -148,16 +150,16 @@ def build_sky130_timing(build_directory, jobs=1):
 
         venv_path = os.path.join(build_directory, "venv")
 
-        with console.status("Building venv..."):
+        with console.status("Building venv…"):
             venv_builder = venv.EnvBuilder(with_pip=True)
             venv_builder.create(venv_path)
         console.log("Done building venv.")
 
-        mkdirp("logs")
+        mkdirp("/tmp/volare/logs")
 
-        with console.status("Installing python-skywater-pdk in venv..."), open(
-            "./logs/venv.stdout", "w"
-        ) as so, open("./logs/venv.stderr", "w") as se:
+        with console.status("Installing python-skywater-pdk in venv…"), open(
+            "/tmp/volare/logs/venv.stdout", "w"
+        ) as so, open("/tmp/volare/logs/venv.stderr", "w") as se:
             subprocess.check_call(
                 [
                     "bash",
@@ -176,9 +178,11 @@ def build_sky130_timing(build_directory, jobs=1):
 
         def do_submodule(submodule: str):
             submodule_cleaned = submodule.strip("/.").replace("/", "_")
-            console.log(f"Processing {submodule}...")
-            with open(f"./logs/{submodule_cleaned}.timing.stdout", "w") as so, open(
-                f"./logs/{submodule_cleaned}.timing.stderr", "w"
+            console.log(f"Processing {submodule}…")
+            with open(
+                f"/tmp/volare/logs/{submodule_cleaned}.timing.stdout", "w"
+            ) as so, open(
+                f"/tmp/volare/logs/{submodule_cleaned}.timing.stderr", "w"
             ) as se:
                 subprocess.check_call(
                     [
@@ -260,7 +264,7 @@ def build_sky130(sram, build_directory, jobs=1):
 
         interrupted = None
         try:
-            console.log("Configuring open_pdks...")
+            console.log("Configuring open_pdks…")
             docker_run(
                 "sh",
                 "-c",
@@ -272,7 +276,7 @@ def build_sky130(sram, build_directory, jobs=1):
             )
             console.log("Done.")
 
-            console.log("Building prequisites...")
+            console.log("Building prequisites…")
             docker_run(
                 "sh",
                 "-c",
@@ -284,7 +288,7 @@ def build_sky130(sram, build_directory, jobs=1):
             )
             console.log("Done.")
 
-            console.log("Building sky130A/B...")
+            console.log("Building sky130A/B…")
             docker_run(
                 "sh",
                 "-c",
@@ -298,11 +302,11 @@ def build_sky130(sram, build_directory, jobs=1):
             )
         except KeyboardInterrupt as e:
             interrupted = e
-            console.log("Stopping on keyboard interrupt...")
-            console.log("Killing docker containers...")
+            console.log("Stopping on keyboard interrupt…")
+            console.log("Killing docker containers…")
             for id in docker_ids:
                 subprocess.call(["docker", "kill", id])
-        console.log("Attempting to fix ownership...")
+        console.log("Attempting to fix ownership…")
         docker_run(
             "sh",
             "-c",
@@ -323,10 +327,10 @@ def build_sky130(sram, build_directory, jobs=1):
         exit(os.EX_DATAERR)
 
 
-def install_sky130(build_directory, versions_directory, version):
+def install_sky130(build_directory, pdk_root, version):
     console = rich.console.Console()
-    with console.status("Adding build to list of installed versions..."):
-        version_directory = os.path.join(versions_directory, version)
+    with console.status("Adding build to list of installed versions…"):
+        version_directory = get_version_dir(pdk_root, version)
         if (
             os.path.exists(version_directory)
             and len(os.listdir(version_directory)) != 0
@@ -335,13 +339,13 @@ def install_sky130(build_directory, versions_directory, version):
             it = 0
             while os.path.exists(backup_path) and len(os.listdir(backup_path)) != 0:
                 it += 1
-                backup_path = os.path.join(versions_directory, f"{version}.bk{it}")
+                backup_path = get_version_dir(pdk_root, f"{version}.bk{it}")
             console.log(
-                f"Build already found at {version_directory}, moving to {backup_path}..."
+                f"Build already found at {version_directory}, moving to {backup_path}…"
             )
             shutil.move(version_directory, backup_path)
 
-        console.log("Copying...")
+        console.log("Copying…")
         mkdirp(version_directory)
 
         sky130A = os.path.join(build_directory, "sky130A")
@@ -387,7 +391,15 @@ def install_sky130(build_directory, versions_directory, version):
     help="Explicitly define a tool metadata file instead of searching for a metadata file",
 )
 @click.argument("version", required=False)
-def build(include_libraries, jobs, sram, pdk_root, clear_build_artifacts, tool_metadata_file_path, version):
+def build(
+    include_libraries,
+    jobs,
+    sram,
+    pdk_root,
+    clear_build_artifacts,
+    tool_metadata_file_path,
+    version,
+):
     """
     Builds the sky130 PDK using open_pdks.
 
@@ -400,13 +412,78 @@ def build(include_libraries, jobs, sram, pdk_root, clear_build_artifacts, tool_m
 
     version = check_version(version, tool_metadata_file_path, rich.console.Console())
 
-    build_directory = os.path.join(pdk_root, "volare", "build", version)
-    versions_directory = os.path.join(pdk_root, "volare", "versions")
+    build_directory = os.path.join(get_volare_dir(pdk_root), "build", version)
     get_open_pdks(version, build_directory, jobs)
     get_sky130(include_libraries, build_directory, jobs)
     build_sky130_timing(build_directory, jobs)
     build_sky130(sram, build_directory, jobs)
-    install_sky130(build_directory, versions_directory, version)
+    install_sky130(build_directory, pdk_root, version)
 
     if clear_build_artifacts:
         shutil.rmtree(build_directory)
+
+
+@click.command(hidden=True)
+@opt_pdk_root
+@opt("-o", "--owner", default="efabless", help="Repository Owner")
+@opt("-r", "--repository", default="volare", help="Repository")
+@opt(
+    "-t",
+    "--token",
+    required=(os.getenv("GITHUB_TOKEN") is None),
+    default=os.getenv("GITHUB_TOKEN"),
+    help="Github Token",
+)
+@click.argument("version")
+def push(owner, repository, token, pdk_root, version):
+    """
+    For maintainers: Package and release a build to the public.
+
+    Requires ghr: github.com/tcnksm/ghr
+
+    Parameters: <version> (required)
+    """
+
+    console = rich.console.Console()
+
+    version_directory = get_version_dir(pdk_root, version)
+
+    tarball_directory = f"/tmp/{uuid.uuid4()}"
+    mkdirp(tarball_directory)
+
+    tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
+
+    with Progress() as progress:
+        glob_string = os.path.join(version_directory, "**/*")
+        all_paths = glob.glob(glob_string, recursive=True)
+        files = [path for path in all_paths if os.path.isfile(path)]
+        task = progress.add_task("Compressing…", total=len(files))
+        with tarfile.open(tarball_path, mode="w:xz") as tf:
+            for i, file in enumerate(files):
+                progress.update(task, completed=i + 1)
+                path_in_tarball = os.path.relpath(file, version_directory)
+                tf.add(file, arcname=path_in_tarball)
+    console.log(f"Compressed to {tarball_path}.")
+
+    tag = f"sky130-{version}"
+
+    # If someone wants to rewrite this to not use ghr, please, by all means.
+    console.log("Starting upload…")
+    subprocess.check_call(
+        [
+            "ghr",
+            "-owner",
+            owner,
+            "-repository",
+            repository,
+            "-token",
+            token,
+            "-body",
+            f"Volare build of sky130 with Open_PDKs {version}",
+            "-commitish",
+            "releases",
+            tag,
+            tarball_path,
+        ]
+    )
+    console.log("Done.")

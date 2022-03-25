@@ -23,3 +23,5 @@ veryclean:
 clean:
 	rm -rf build/
 	rm -rf logs/
+	rm -rf dist/
+	rm -rf *.egg-info

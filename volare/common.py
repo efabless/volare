@@ -16,6 +16,7 @@
 import os
 from functools import partial
 from typing import Optional
+from typing import Callable
 
 import rich
 import click
@@ -23,12 +24,13 @@ import click
 opt = partial(click.option, show_default=True)
 
 
-def opt_pdk_root(function):
+def opt_pdk_root(function: Callable):
     function = click.option(
         "--pdk-root",
-        required=(os.getenv("PDK_ROOT") is None),
-        default=os.getenv("PDK_ROOT"),
-        help="Path to the PDK root [required if environment variable PDK_ROOT is not set]",
+        required=False,
+        default=os.getenv("PDK_ROOT") or os.path.expanduser("~/.volare"),
+        help="Path to the PDK root",
+        show_default=True,
     )(function)
     return function
 
@@ -36,7 +38,7 @@ def opt_pdk_root(function):
 def check_version(
     version: Optional[str],
     tool_metadata_file_path: Optional[str],
-    console: Optional[rich.console.Console] = None
+    console: Optional[rich.console.Console] = None,
 ) -> str:
     """
     Takes an optional version and tool_metadata_file_path.
@@ -89,3 +91,20 @@ def check_version(
     pr(f"Found version {version} in {tool_metadata_file_path}.")
 
     return version
+
+
+def get_volare_dir(pdk_root: str) -> str:
+    return os.path.join(pdk_root, "volare", "sky130")
+
+
+def get_versions_dir(pdk_root: str) -> str:
+    return os.path.join(get_volare_dir(pdk_root), "versions")
+
+
+def get_version_dir(pdk_root: str, version: str) -> str:
+    return os.path.join(get_versions_dir(pdk_root), version)
+
+
+def get_link_of(version: str) -> str:
+    repo = os.getenv("VOLARE_REPOSITORY") or "https://github.com/efabless/volare"
+    return f"{repo}/releases/download/sky130-{version}/{version}.tar.xz"

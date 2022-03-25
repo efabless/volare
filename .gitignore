@@ -5,3 +5,5 @@ venv/
 logs/
 dist/
 *.egg-info/
+.vscode/
+.idea/
