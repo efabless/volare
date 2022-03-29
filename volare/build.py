@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import re
-import glob
 import venv
 import uuid
 import shutil
+import pathlib
 import tarfile
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
@@ -27,7 +26,14 @@ import click
 from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone, Repository, mkdirp
-from .common import opt, opt_pdk_root, check_version, get_version_dir, get_volare_dir
+from .common import (
+    opt,
+    opt_pdk_root,
+    check_version,
+    get_version_dir,
+    get_volare_dir,
+    SKY130_VARIANTS,
+)
 
 
 class RepoMetadata(object):
@@ -85,7 +91,7 @@ def get_open_pdks(version, build_directory, jobs=1):
 
 def get_sky130(include_libraries, build_directory, jobs=1):
     try:
-        rx = re.compile(rf"^({include_libraries})$")
+        all = "all" in include_libraries
         console = rich.console.Console()
 
         sky130_repo = None
@@ -117,7 +123,7 @@ def get_sky130(include_libraries, build_directory, jobs=1):
                 sky130_submodules_filtered = [
                     sm
                     for sm in sky130_submodules
-                    if rx.search(sm.split("/")[1]) is not None
+                    if (sm.split("/")[1] in include_libraries or all)
                 ]
                 for submodule in sky130_submodules_filtered:
                     executor.submit(
@@ -348,14 +354,13 @@ def install_sky130(build_directory, pdk_root, version):
         console.log("Copying…")
         mkdirp(version_directory)
 
-        sky130A = os.path.join(build_directory, "sky130A")
-        sky130B = os.path.join(build_directory, "sky130B")
-
-        sky130A_installed = os.path.join(version_directory, "sky130A")
-        sky130B_installed = os.path.join(version_directory, "sky130B")
-
-        shutil.copytree(sky130A, sky130A_installed)
-        shutil.copytree(sky130B, sky130B_installed)
+        for variant in SKY130_VARIANTS:
+            variant_build_path = os.path.join(build_directory, variant)
+            variant_install_path = os.path.join(version_directory, variant)
+            variant_sources_file = os.path.join(variant_install_path, "SOURCES")
+            shutil.copytree(variant_build_path, variant_install_path)
+            with open(variant_sources_file, "w") as f:
+                print(f"open_pdks {version}", file=f)
 
     console.log("Done.")
 
@@ -368,8 +373,9 @@ def install_sky130(build_directory, pdk_root, version):
 @opt(
     "-l",
     "--include-libraries",
-    default="sky130_fd_sc_hd|sky130_fd_sc_hvl|sky130_fd_io|sky130_fd_pr",
-    help="Regular expression for libraries to include. Use '.+' to include all of them.",
+    multiple=True,
+    default=["sky130_fd_sc_hd", "sky130_fd_sc_hvl", "sky130_fd_io", "sky130_fd_pr"],
+    help="Libraries to include in the build. You can use -l multiple times to include multiple libraries. Pass 'all' to include all of them.",
 )
 @opt(
     "-j",
@@ -454,9 +460,8 @@ def push(owner, repository, token, pdk_root, version):
     tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
 
     with Progress() as progress:
-        glob_string = os.path.join(version_directory, "**/*")
-        all_paths = glob.glob(glob_string, recursive=True)
-        files = [path for path in all_paths if os.path.isfile(path)]
+        path_it = pathlib.Path(version_directory).glob("**/*")
+        files = [str(path) for path in path_it if path.is_file()]
         task = progress.add_task("Compressing…", total=len(files))
         with tarfile.open(tarball_path, mode="w:xz") as tf:
             for i, file in enumerate(files):

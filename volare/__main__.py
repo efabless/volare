@@ -16,17 +16,20 @@ import click
 from click_default_group import DefaultGroup
 
 from .build import build, push
-from .manage import manage
+from .manage import path_cmd, output, list_cmd, enable
 
 
-@click.group(cls=DefaultGroup, default="manage", default_if_no_args=True)
+@click.group(cls=DefaultGroup, default="output", default_if_no_args=True)
 def cli():
     pass
 
 
+cli.add_command(output)
 cli.add_command(build)
-cli.add_command(manage)
 cli.add_command(push)
+cli.add_command(path_cmd)
+cli.add_command(list_cmd)
+cli.add_command(enable)
 
 
 if __name__ == "__main__":
