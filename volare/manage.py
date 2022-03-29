@@ -34,6 +34,7 @@ from .common import (
     get_versions_dir,
     get_version_dir,
     get_volare_dir,
+    SKY130_VARIANTS,
 )
 
 
@@ -68,7 +69,7 @@ def manage():
 @click.command()
 @opt_pdk_root
 def output(pdk_root):
-    """Outputs the currently installed PDK version."""
+    """(Default) Outputs the currently installed PDK version."""
     current_file = os.path.join(get_volare_dir(pdk_root), "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
@@ -86,17 +87,11 @@ def output(pdk_root):
             print(f"{file_content}", end="")
 
 
-manage.add_command(output)
-
-
-@click.command("list")
+@click.command("list", hidden=True)
 @opt_pdk_root
 def list_cmd(pdk_root):
     """Lists installed PDK versions in a parsable format."""
     print(json.dumps(get_installed_list(pdk_root)))
-
-
-manage.add_command(list_cmd)
 
 
 @click.command("path")
@@ -108,9 +103,6 @@ def path_cmd(pdk_root, version):
     if version is not None:
         path_to_print = os.path.join(get_versions_dir(pdk_root), version)
     print(path_to_print, end="")
-
-
-manage.add_command(path_cmd)
 
 
 @click.command()
@@ -143,9 +135,10 @@ def enable(pdk_root, tool_metadata_file_path, version):
 
     version_directory = get_version_dir(pdk_root, version)
 
-    variants = ["sky130A", "sky130B"]
-    version_paths = [os.path.join(version_directory, variant) for variant in variants]
-    final_paths = [os.path.join(pdk_root, variant) for variant in variants]
+    version_paths = [
+        os.path.join(version_directory, variant) for variant in SKY130_VARIANTS
+    ]
+    final_paths = [os.path.join(pdk_root, variant) for variant in SKY130_VARIANTS]
 
     if not os.path.exists(version_directory):
         link = get_link_of(version)
@@ -185,6 +178,8 @@ def enable(pdk_root, tool_metadata_file_path, version):
                             with open(final_path, "wb") as f:
                                 f.write(io.read())
 
+                os.unlink(tarball_path)
+
     with console.status(f"Enabling version {version}…"):
         for path in final_paths:
             if os.path.exists(path):
@@ -204,6 +199,3 @@ def enable(pdk_root, tool_metadata_file_path, version):
             f.write(version)
 
     console.print(f"PDK version {version} enabled.")
-
-
-manage.add_command(enable)
