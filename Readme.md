@@ -26,7 +26,7 @@ In its current inception, volare supports builds of the sky130 PDK using [Open_P
 
 You can enable a particular sky130 PDK by invoking `volare enable <open_pdks version>`. This will automatically download that particular version of the PDK, if found, and set it as your currently used PDK.
 
-For example, to enable open_pdks `4040b7ca03d03bbbefbc8b1d0f7016cc04275c24`, you invoke `volare enable 4040b7ca03d03bbbefbc8b1d0f7016cc04275c24`.
+For example, to enable open_pdks `7519dfb04400f224f140749cda44ee7de6f5e095`, you invoke `volare enable 7519dfb04400f224f140749cda44ee7de6f5e095`.
 
 Of course, this isn't 100% ideal. If you're using a repository with a tool_metadata.yml file, such as [OpenLane](https://github.com/The-OpenROAD-Project/OpenLane) or [DFFRAM](https://github.com/Cloud-V/DFFRAM), you can just invoke `volare enable` and Volare will automatically infer the version you're looking folder.
 
@@ -35,7 +35,7 @@ Invoking Volare in a terminal will look something like this:
 
 ```
 /usr/local/pdk/volare/versions
-├── 4040b7ca03d03bbbefbc8b1d0f7016cc04275c24 (enabled)    
+├── 7519dfb04400f224f140749cda44ee7de6f5e095 (enabled)    
 └── 34eeb2743e99d44a21c2cedd467675a2e0f3bb91
 ```
 
