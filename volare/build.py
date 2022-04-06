@@ -18,6 +18,7 @@ import uuid
 import shutil
 import pathlib
 import tarfile
+import tempfile
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
@@ -32,7 +33,6 @@ from .common import (
     check_version,
     get_version_dir,
     get_volare_dir,
-    SKY130_VARIANTS,
 )
 
 
@@ -354,14 +354,6 @@ def install_sky130(build_directory, pdk_root, version):
         console.log("Copying…")
         mkdirp(version_directory)
 
-        for variant in SKY130_VARIANTS:
-            variant_build_path = os.path.join(build_directory, variant)
-            variant_install_path = os.path.join(version_directory, variant)
-            variant_sources_file = os.path.join(variant_install_path, "SOURCES")
-            shutil.copytree(variant_build_path, variant_install_path)
-            with open(variant_sources_file, "w") as f:
-                print(f"open_pdks {version}", file=f)
-
     console.log("Done.")
 
 
@@ -454,10 +446,11 @@ def push(owner, repository, token, pdk_root, version):
 
     version_directory = get_version_dir(pdk_root, version)
 
-    tarball_directory = f"/tmp/{uuid.uuid4()}"
+    tempdir = tempfile.gettempdir()
+    tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}", version)
     mkdirp(tarball_directory)
 
-    tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
+    tarball_path = os.path.join(tarball_directory, "default.tar.xz")
 
     with Progress() as progress:
         path_it = pathlib.Path(version_directory).glob("**/*")

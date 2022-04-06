@@ -19,6 +19,7 @@ import uuid
 import tarfile
 import pathlib
 import requests
+import tempfile
 
 import rich
 import rich.tree
@@ -149,15 +150,15 @@ def enable(pdk_root, tool_metadata_file_path, version):
             )
             exit(1)
 
-        tarball_directory = f"/tmp/{uuid.uuid4()}"
+        tempdir = tempfile.gettempdir()
+        tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}")
         mkdirp(tarball_directory)
 
         tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
-
         with requests.get(link, stream=True) as r:
             with rich.progress.Progress() as p:
                 task = p.add_task(
-                    f"Downloading {version}.tar.xz…",
+                    f"Downloading pre-built tarball for {version}…",
                     total=int(r.headers["Content-length"]),
                 )
                 r.raise_for_status()
@@ -177,6 +178,13 @@ def enable(pdk_root, tool_metadata_file_path, version):
                         with tf.extractfile(file) as io:
                             with open(final_path, "wb") as f:
                                 f.write(io.read())
+
+                for variant in SKY130_VARIANTS:
+                    variant_install_path = os.path.join(version_directory, variant)
+                    variant_sources_file = os.path.join(variant_install_path, "SOURCES")
+                    if not os.path.isfile(variant_sources_file):
+                        with open(variant_sources_file, "w") as f:
+                            print(f"open_pdks {version}", file=f)
 
                 os.unlink(tarball_path)
 

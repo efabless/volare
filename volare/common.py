@@ -107,7 +107,7 @@ def get_version_dir(pdk_root: str, version: str) -> str:
 
 def get_link_of(version: str) -> str:
     repo = os.getenv("VOLARE_REPOSITORY") or "https://github.com/efabless/volare"
-    return f"{repo}/releases/download/sky130-{version}/{version}.tar.xz"
+    return f"{repo}/releases/download/sky130-{version}/default.tar.xz"
 
 
 SKY130_VARIANTS = ["sky130A", "sky130B"]
