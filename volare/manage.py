@@ -36,6 +36,7 @@ from .common import (
     get_version_dir,
     get_volare_dir,
     SKY130_VARIANTS,
+    get_version_list,
 )
 
 
@@ -45,12 +46,14 @@ def get_installed_list(pdk_root):
     return os.listdir(versions_dir)
 
 
-def print_installed_list(pdk_root, version, console):
+def print_installed_list(pdk_root, console):
     installed_list = get_installed_list(pdk_root)
     versions_dir = get_versions_dir(pdk_root)
     if len(installed_list) == 0:
         console.print("[red]No PDKs installed.")
         return
+
+    version = get_current_version(pdk_root)
 
     tree = rich.tree.Tree(f"{versions_dir}")
     for installed in installed_list:
@@ -59,6 +62,31 @@ def print_installed_list(pdk_root, version, console):
         else:
             tree.add(installed)
     console.print(tree)
+
+
+def print_remote_list(pdk_root, console, pdk_list):
+    installed_list = get_installed_list(pdk_root)
+
+    version = get_current_version(pdk_root)
+
+    tree = rich.tree.Tree("Pre-built PDKs")
+    for pdk in pdk_list:
+        if pdk == version:
+            tree.add(f"[green][bold]{pdk} (enabled)")
+        elif pdk in installed_list:
+            tree.add(f"[green]{pdk} (installed)")
+        else:
+            tree.add(pdk)
+    console.print(tree)
+
+
+def get_current_version(pdk_root):
+    current_file = os.path.join(get_volare_dir(pdk_root), "current")
+    current_file_dir = os.path.dirname(current_file)
+    mkdirp(current_file_dir)
+    pathlib.Path(current_file).touch(exist_ok=True)
+
+    return open(current_file).read().strip()
 
 
 @click.group(cls=DefaultGroup, default="output", default_if_no_args=True)
@@ -71,28 +99,30 @@ def manage():
 @opt_pdk_root
 def output(pdk_root):
     """(Default) Outputs the currently installed PDK version."""
-    current_file = os.path.join(get_volare_dir(pdk_root), "current")
-    current_file_dir = os.path.dirname(current_file)
-    mkdirp(current_file_dir)
-    pathlib.Path(current_file).touch(exist_ok=True)
-
-    file_content = open(current_file).read().strip()
 
     if sys.stdout.isatty():
         console = rich.console.Console()
-        print_installed_list(pdk_root, file_content, console)
+        print_installed_list(pdk_root, console)
     else:
-        if file_content == "":
+        version = get_current_version()
+        if version == "":
             exit(1)
         else:
-            print(f"{file_content}", end="")
+            print(version, end="")
 
 
 @click.command("list", hidden=True)
 @opt_pdk_root
 def list_cmd(pdk_root):
-    """Lists installed PDK versions in a parsable format."""
-    print(json.dumps(get_installed_list(pdk_root)))
+    """Lists PDK versions that are remotely available. JSON if not outputting to a tty."""
+
+    pdk_versions = get_version_list()
+
+    if sys.stdout.isatty():
+        console = rich.console.Console()
+        print_remote_list(pdk_root, console, pdk_versions)
+    else:
+        print(json.dumps(pdk_versions))
 
 
 @click.command("path")

@@ -33,6 +33,7 @@ from .common import (
     check_version,
     get_version_dir,
     get_volare_dir,
+    SKY130_VARIANTS,
 )
 
 
@@ -354,6 +355,11 @@ def install_sky130(build_directory, pdk_root, version):
         console.log("Copying…")
         mkdirp(version_directory)
 
+        for variant in SKY130_VARIANTS:
+            variant_build_path = os.path.join(build_directory, variant)
+            variant_install_path = os.path.join(version_directory, variant)
+            shutil.copytree(variant_build_path, variant_install_path)
+
     console.log("Done.")
 
 
@@ -445,6 +451,9 @@ def push(owner, repository, token, pdk_root, version):
     console = rich.console.Console()
 
     version_directory = get_version_dir(pdk_root, version)
+    if not os.path.isdir(version_directory):
+        console.print("[red]Version not found.")
+        exit(os.EX_NOINPUT)
 
     tempdir = tempfile.gettempdir()
     tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}", version)

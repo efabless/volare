@@ -14,12 +14,18 @@
 # limitations under the License.
 
 import os
+import json
+import requests
 from functools import partial
-from typing import Optional
-from typing import Callable
+from typing import Optional, Callable, List
 
 import rich
 import click
+
+VOLARE_REPO_ID = os.getenv("VOLARE_REPOSITORY") or "efabless/volare"
+VOLARE_REPO_HTTPS = f"https://github.com/{VOLARE_REPO_ID}"
+VOLARE_REPO_API = f"https://api.github.com/repos/{VOLARE_REPO_ID}"
+SKY130_VARIANTS = ["sky130A", "sky130B"]
 
 opt = partial(click.option, show_default=True)
 
@@ -106,8 +112,17 @@ def get_version_dir(pdk_root: str, version: str) -> str:
 
 
 def get_link_of(version: str) -> str:
-    repo = os.getenv("VOLARE_REPOSITORY") or "https://github.com/efabless/volare"
-    return f"{repo}/releases/download/sky130-{version}/default.tar.xz"
+    return f"{VOLARE_REPO_HTTPS}/releases/download/sky130-{version}/default.tar.xz"
 
 
-SKY130_VARIANTS = ["sky130A", "sky130B"]
+def get_version_list() -> List[str]:
+    response_str = requests.get(f"{VOLARE_REPO_API}/releases").content.decode("utf8")
+    releases = json.loads(response_str)
+    pdk_versions = [release["tag_name"] for release in releases]
+    pdk_versions_by_pdk = {}
+    for version in pdk_versions:
+        pdk, hash = version.split("-")
+        if pdk_versions_by_pdk.get(pdk) is None:
+            pdk_versions_by_pdk[pdk] = pdk_versions_by_pdk.get(pdk) or []
+        pdk_versions_by_pdk[pdk].append(hash)
+    return pdk_versions_by_pdk["sky130"]
