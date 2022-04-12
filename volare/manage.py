@@ -30,6 +30,9 @@ from click_default_group import DefaultGroup
 from .git_multi_clone import mkdirp
 from .common import (
     get_link_of,
+    opt,
+    opt_build,
+    opt_push,
     opt_pdk_root,
     check_version,
     get_versions_dir,
@@ -38,6 +41,7 @@ from .common import (
     SKY130_VARIANTS,
     get_version_list,
 )
+from .build import build, push
 
 
 def get_installed_list(pdk_root):
@@ -97,7 +101,7 @@ def manage():
 
 @click.command()
 @opt_pdk_root
-def output(pdk_root):
+def output_cmd(pdk_root):
     """(Default) Outputs the currently installed PDK version."""
 
     if sys.stdout.isatty():
@@ -136,29 +140,15 @@ def path_cmd(pdk_root, version):
     print(path_to_print, end="")
 
 
-@click.command()
-@opt_pdk_root
-@click.option(
-    "-f",
-    "--metadata-file",
-    "tool_metadata_file_path",
-    default=None,
-    help="Explicitly define a tool metadata file instead of searching for a metadata file",
-)
-@click.argument("version", required=False)
-def enable(pdk_root, tool_metadata_file_path, version):
-    """
-    Activates a given PDK version.
-
-    Parameters: <version> (Optional)
-
-    If a version is not given, and you run this in the top level directory of
-    tools with a tool_metadata.yml file, for example OpenLane or DFFRAM,
-    the appropriate version will be enabled automatically.
-    """
+def enable(
+    pdk_root,
+    version,
+    build_if_not_found=False,
+    also_push=False,
+    build_kwargs={},
+    push_kwargs={},
+):
     console = rich.console.Console()
-
-    version = check_version(version, tool_metadata_file_path, console)
 
     current_file = os.path.join(get_volare_dir(pdk_root), "current")
     current_file_dir = os.path.dirname(current_file)
@@ -175,48 +165,58 @@ def enable(pdk_root, tool_metadata_file_path, version):
         link = get_link_of(version)
         status = requests.head(link).status_code
         if status == 404:
-            console.print(
-                f"[red]Version {version} not found either remotely or locally.\nTry volare build {version}."
-            )
-            exit(1)
-
-        tempdir = tempfile.gettempdir()
-        tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}")
-        mkdirp(tarball_directory)
-
-        tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
-        with requests.get(link, stream=True) as r:
-            with rich.progress.Progress() as p:
-                task = p.add_task(
-                    f"Downloading pre-built tarball for {version}…",
-                    total=int(r.headers["Content-length"]),
+            if build_if_not_found:
+                console.print(
+                    f"Version {version} not found either locally or remotely. Will attempt to build."
                 )
-                r.raise_for_status()
-                with open(tarball_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        p.advance(task, advance=len(chunk))
-                        f.write(chunk)
+                build(pdk_root=pdk_root, version=version, **build_kwargs)
+                if also_push:
+                    push(pdk_root, version, **push_kwargs)
+            else:
+                console.print(
+                    f"[red]Version {version} not found either locally or remotely.\nTry volare build {version}."
+                )
+                exit(1)
+        else:
+            tempdir = tempfile.gettempdir()
+            tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}")
+            mkdirp(tarball_directory)
 
-                task = p.add_task("Unpacking…")
-                with tarfile.open(tarball_path, mode="r:*") as tf:
-                    p.update(task, total=len(tf.getmembers()))
-                    for i, file in enumerate(tf.getmembers()):
-                        p.update(task, completed=i + 1)
-                        final_path = os.path.join(version_directory, file.name)
-                        final_dir = os.path.dirname(final_path)
-                        mkdirp(final_dir)
-                        with tf.extractfile(file) as io:
-                            with open(final_path, "wb") as f:
-                                f.write(io.read())
+            tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
+            with requests.get(link, stream=True) as r:
+                with rich.progress.Progress() as p:
+                    task = p.add_task(
+                        f"Downloading pre-built tarball for {version}…",
+                        total=int(r.headers["Content-length"]),
+                    )
+                    r.raise_for_status()
+                    with open(tarball_path, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            p.advance(task, advance=len(chunk))
+                            f.write(chunk)
 
-                for variant in SKY130_VARIANTS:
-                    variant_install_path = os.path.join(version_directory, variant)
-                    variant_sources_file = os.path.join(variant_install_path, "SOURCES")
-                    if not os.path.isfile(variant_sources_file):
-                        with open(variant_sources_file, "w") as f:
-                            print(f"open_pdks {version}", file=f)
+                    task = p.add_task("Unpacking…")
+                    with tarfile.open(tarball_path, mode="r:*") as tf:
+                        p.update(task, total=len(tf.getmembers()))
+                        for i, file in enumerate(tf.getmembers()):
+                            p.update(task, completed=i + 1)
+                            final_path = os.path.join(version_directory, file.name)
+                            final_dir = os.path.dirname(final_path)
+                            mkdirp(final_dir)
+                            with tf.extractfile(file) as io:
+                                with open(final_path, "wb") as f:
+                                    f.write(io.read())
 
-                os.unlink(tarball_path)
+                    for variant in SKY130_VARIANTS:
+                        variant_install_path = os.path.join(version_directory, variant)
+                        variant_sources_file = os.path.join(
+                            variant_install_path, "SOURCES"
+                        )
+                        if not os.path.isfile(variant_sources_file):
+                            with open(variant_sources_file, "w") as f:
+                                print(f"open_pdks {version}", file=f)
+
+                    os.unlink(tarball_path)
 
     with console.status(f"Enabling version {version}…"):
         for path in final_paths:
@@ -237,3 +237,77 @@ def enable(pdk_root, tool_metadata_file_path, version):
             f.write(version)
 
     console.print(f"PDK version {version} enabled.")
+
+
+@click.command("enable")
+@opt_pdk_root
+@click.option(
+    "-f",
+    "--metadata-file",
+    "tool_metadata_file_path",
+    default=None,
+    help="Explicitly define a tool metadata file instead of searching for a metadata file",
+)
+@click.argument("version", required=False)
+def enable_cmd(pdk_root, tool_metadata_file_path, version):
+    """
+    Activates a given PDK version.
+
+    Parameters: <version> (Optional)
+
+    If a version is not given, and you run this in the top level directory of
+    tools with a tool_metadata.yml file, for example OpenLane or DFFRAM,
+    the appropriate version will be enabled automatically.
+    """
+    console = rich.console.Console()
+    version = check_version(version, tool_metadata_file_path, console)
+    enable(pdk_root, version)
+
+
+@click.command("enable_or_build", hidden=True)
+@opt_pdk_root
+@opt_push
+@opt_build
+@opt("--also-push/--dont-push", default=False, help="Also push.")
+@click.option(
+    "-f",
+    "--metadata-file",
+    "tool_metadata_file_path",
+    default=None,
+    help="Explicitly define a tool metadata file instead of searching for a metadata file",
+)
+@click.argument("version")
+def enable_or_build_cmd(
+    include_libraries,
+    jobs,
+    sram,
+    pdk_root,
+    owner,
+    repository,
+    token,
+    clear_build_artifacts,
+    tool_metadata_file_path,
+    also_push,
+    version,
+):
+    """
+    Attempts to activate a given PDK version. If the version is not found locally or remotely,
+    it will instead attempt to build said version.
+
+    Parameters: <version>
+    """
+    console = rich.console.Console()
+    version = check_version(version, tool_metadata_file_path, console)
+    enable(
+        pdk_root,
+        version,
+        build_if_not_found=True,
+        also_push=also_push,
+        build_kwargs={
+            "include_libraries": include_libraries,
+            "jobs": jobs,
+            "sram": sram,
+            "clear_build_artifacts": clear_build_artifacts,
+        },
+        push_kwargs={"owner": owner, "repository": repository, "token": token},
+    )
