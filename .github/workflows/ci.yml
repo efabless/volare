@@ -42,7 +42,7 @@ jobs:
       - name: Set default for env.NEW_TAG
         run: echo "NEW_TAG=NO_NEW_TAG" >> $GITHUB_ENV
       - name: Check for new version
-        if: ${{ env.BRANCH_NAME == "main" }}
+        if: ${{ env.BRANCH_NAME == 'main' }}
         run: cd ${GITHUB_WORKSPACE}/ && python3 ${GITHUB_WORKSPACE}/.github/scripts/generate_tag.py
       - name: Tag Commit
         if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}

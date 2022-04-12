@@ -10,7 +10,7 @@ It only works with portable versions of the sky130 open_pdk builds.
 
 # Installation
 ```sh
-python3 -m pip install --upgrade volare
+python3 -m pip install --upgrade --no-cache-dir volare
 ```
 
 # Usage
