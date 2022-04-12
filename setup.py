@@ -1,22 +1,13 @@
-import os
-import sys
-import subprocess
 from setuptools import setup, find_packages
 
-requirements = open("requirements.txt").read().strip().split("\n")
+from volare import __version__
 
-try:
-    version = (
-        subprocess.check_output(["git", "describe", "--tags"]).decode("utf8").strip()
-    )
-except subprocess.CalledProcessError:
-    print("Volare must be built with a full Git clone.", file=sys.stderr)
-    exit(os.EX_DATAERR)
+requirements = open("requirements.txt").read().strip().split("\n")
 
 setup(
     name="volare",
     packages=find_packages(),
-    version=version,
+    version=__version__,
     description="A sky130 PDK builder/version manager",
     long_description=open("Readme.md").read(),
     long_description_content_type="text/markdown",

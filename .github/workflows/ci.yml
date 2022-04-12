@@ -3,6 +3,8 @@ name: CI
 # Events that trigger workflow
 on:
   push:
+    branches:
+      - "*"
   pull_request:
 
 jobs:
@@ -17,31 +19,39 @@ jobs:
       - name: Lint
         run: make lint
   push_to_pypi:
-    name: Build (and push, if applicable)
+    name: Build (and publish, if applicable)
     runs-on: ubuntu-20.04
     needs: lint_python
     steps:
-    - name: Check out Git repository
-      uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-    - name: Get Tag
-      if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
-      run: |
-        echo VOLARE_BUILD_TAG="$(ruby -e "print '$GITHUB_REF'.split('/')[2]")" >> $GITHUB_ENV
-        echo TAGGED=1 >> $GITHUB_ENV
-    - name: Set Up Python 3.6
-      uses: actions/setup-python@v1
-      with:
-        python-version: 3.6
-    - name: Install Build Dependencies
-      run: |
-        python3 -m pip install build
-    - name: Build
-      run: |
-        python3 -m build --sdist --wheel --outdir dist/ .
-    - name: Publish (if tagged)
-      if: ${{ env.TAGGED == '1' }}
-      uses: pypa/gh-action-pypi-publish@master
-      with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Check out Git repository
+        uses: actions/checkout@v2
+      - name: Export Repo URL
+        run: echo "REPO_URL=https://github.com/${{ github.repository }}" >> $GITHUB_ENV
+      - name: Export Branch Name
+        run: echo "BRANCH_NAME=${GITHUB_REF##*/}" >> $GITHUB_ENV
+      - name: Set Up Python 3.6
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.6
+      - name: Install Build Dependencies
+        run: |
+          python3 -m pip install build
+      - name: Build
+        run: |
+          python3 -m build --sdist --wheel --outdir dist/ .
+      - name: Set default for env.NEW_TAG
+        run: echo "NEW_TAG=NO_NEW_TAG" >> $GITHUB_ENV
+      - name: Check for new version
+        if: ${{ env.BRANCH_NAME == "main" }}
+        run: cd ${GITHUB_WORKSPACE}/ && python3 ${GITHUB_WORKSPACE}/.github/scripts/generate_tag.py
+      - name: Tag Commit
+        if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
+        uses: tvdias/github-tagger@v0.0.1
+        with:
+          tag: "${{ env.NEW_TAG }}"
+          repo-token: "${{ secrets.MY_TOKEN }}"
+      - name: Publish
+        if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Copyright 2022 Efabless Corporation
+# -*- coding: utf-8 -*-
+# Copyright 2020 Efabless Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,31 +13,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import click
-from click_default_group import DefaultGroup
+import os
+import sys
 
-from .build import build, push
-from .manage import path_cmd, output, list_cmd, enable
-from . import __version__
+from gh import gh
 
+sys.path.insert(0, os.getcwd())
 
-@click.group(
-    cls=DefaultGroup,
-    default="output",
-    default_if_no_args=True,
-)
-@click.version_option(__version__)
-def cli():
-    pass
+import volare
 
+print("Getting tags…")
 
-cli.add_command(output)
-cli.add_command(build)
-cli.add_command(push)
-cli.add_command(path_cmd)
-cli.add_command(list_cmd)
-cli.add_command(enable)
+latest_tag = None
+latest_tag_commit = None
+tags = [pair[1] for pair in gh.volare.tags]
 
+tag_exists = volare.__version__ in tags
 
-if __name__ == "__main__":
-    cli()
+if tag_exists:
+    print("Tag already exists. Leaving NEW_TAG unaltered.")
+else:
+    new_tag = volare.__version__
+
+    print("Found new tag %s." % new_tag)
+    gh.export_env("NEW_TAG", new_tag)
