@@ -20,7 +20,7 @@ from gh import gh
 
 sys.path.insert(0, os.getcwd())
 
-import volare
+import volare  # noqa: E402
 
 print("Getting tags…")
 
