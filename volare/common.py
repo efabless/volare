@@ -22,10 +22,19 @@ from typing import Optional, Callable, List
 import rich
 import click
 
-VOLARE_REPO_ID = os.getenv("VOLARE_REPOSITORY") or "efabless/volare"
+VOLARE_REPO_OWNER = os.getenv("VOLARE_REPO_OWNER") or "efabless"
+VOLARE_REPO_NAME = os.getenv("VOLARE_REPO_NAME") or "volare"
+VOLARE_REPO_ID = f"{VOLARE_REPO_OWNER}/{VOLARE_REPO_NAME}"
 VOLARE_REPO_HTTPS = f"https://github.com/{VOLARE_REPO_ID}"
 VOLARE_REPO_API = f"https://api.github.com/repos/{VOLARE_REPO_ID}"
+
 SKY130_VARIANTS = ["sky130A", "sky130B"]
+SKY130_DEFAULT_LIBRARIES = [
+    "sky130_fd_sc_hd",
+    "sky130_fd_sc_hvl",
+    "sky130_fd_io",
+    "sky130_fd_pr",
+]
 
 opt = partial(click.option, show_default=True)
 
@@ -37,6 +46,48 @@ def opt_pdk_root(function: Callable):
         default=os.getenv("PDK_ROOT") or os.path.expanduser("~/.volare"),
         help="Path to the PDK root",
         show_default=True,
+    )(function)
+    return function
+
+
+def opt_build(function: Callable):
+    function = opt(
+        "-l",
+        "--include-libraries",
+        multiple=True,
+        default=SKY130_DEFAULT_LIBRARIES,
+        help="Libraries to include in the build. You can use -l multiple times to include multiple libraries. Pass 'all' to include all of them.",
+    )(function)
+    function = opt(
+        "-j",
+        "--jobs",
+        default=1,
+        help="Specifies the number of commands to run simultaneously.",
+    )(function)
+    function = opt("--sram/--no-sram", default=True, help="Enable or disable sram")(
+        function
+    )
+    function = opt(
+        "--clear-build-artifacts/--keep-build-artifacts",
+        default=False,
+        help="Whether or not to remove the build artifacts. Keeping the build artifacts is useful when testing.",
+    )(function)
+    return function
+
+
+def opt_push(function: Callable):
+    function = opt("-o", "--owner", default=VOLARE_REPO_OWNER, help="Repository Owner")(
+        function
+    )
+    function = opt("-r", "--repository", default=VOLARE_REPO_NAME, help="Repository")(
+        function
+    )
+    function = opt(
+        "-t",
+        "--token",
+        required=(os.getenv("GITHUB_TOKEN") is None),
+        default=os.getenv("GITHUB_TOKEN"),
+        help="Github Token",
     )(function)
     return function
 

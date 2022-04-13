@@ -15,9 +15,9 @@
 import click
 from click_default_group import DefaultGroup
 
-from .build import build, push
-from .manage import path_cmd, output, list_cmd, enable
 from . import __version__
+from .build import build_cmd, push_cmd
+from .manage import output_cmd, path_cmd, list_cmd, enable_cmd, enable_or_build_cmd
 
 
 @click.group(
@@ -30,12 +30,13 @@ def cli():
     pass
 
 
-cli.add_command(output)
-cli.add_command(build)
-cli.add_command(push)
+cli.add_command(output_cmd)
+cli.add_command(build_cmd)
+cli.add_command(push_cmd)
 cli.add_command(path_cmd)
 cli.add_command(list_cmd)
-cli.add_command(enable)
+cli.add_command(enable_cmd)
+cli.add_command(enable_or_build_cmd)
 
 
 if __name__ == "__main__":

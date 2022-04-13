@@ -28,12 +28,16 @@ from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone, Repository, mkdirp
 from .common import (
-    opt,
     opt_pdk_root,
+    opt_build,
     check_version,
     get_version_dir,
     get_volare_dir,
     SKY130_VARIANTS,
+    SKY130_DEFAULT_LIBRARIES,
+    VOLARE_REPO_OWNER,
+    VOLARE_REPO_NAME,
+    opt_push,
 )
 
 
@@ -364,29 +368,30 @@ def install_sky130(build_directory, pdk_root, version):
 
 
 # ---
+def build(
+    pdk_root,
+    version,
+    jobs=1,
+    sram=True,
+    clear_build_artifacts=True,
+    include_libraries=None,
+):
+    if include_libraries is None:
+        include_libraries = SKY130_DEFAULT_LIBRARIES
+    build_directory = os.path.join(get_volare_dir(pdk_root), "build", version)
+    get_open_pdks(version, build_directory, jobs)
+    get_sky130(include_libraries, build_directory, jobs)
+    build_sky130_timing(build_directory, jobs)
+    build_sky130(sram, build_directory, jobs)
+    install_sky130(build_directory, pdk_root, version)
+
+    if clear_build_artifacts:
+        shutil.rmtree(build_directory)
 
 
-@click.command()
+@click.command("build")
 @opt_pdk_root
-@opt(
-    "-l",
-    "--include-libraries",
-    multiple=True,
-    default=["sky130_fd_sc_hd", "sky130_fd_sc_hvl", "sky130_fd_io", "sky130_fd_pr"],
-    help="Libraries to include in the build. You can use -l multiple times to include multiple libraries. Pass 'all' to include all of them.",
-)
-@opt(
-    "-j",
-    "--jobs",
-    default=1,
-    help="Specifies the number of commands to run simultaneously.",
-)
-@opt("--sram/--no-sram", default=True, help="Enable or disable sram")
-@opt(
-    "--clear-build-artifacts/--keep-build-artifacts",
-    default=False,
-    help="Whether or not to remove the build artifacts. Keeping the build artifacts is useful when testing.",
-)
+@opt_build
 @click.option(
     "-f",
     "--metadata-file",
@@ -395,7 +400,7 @@ def install_sky130(build_directory, pdk_root, version):
     help="Explicitly define a tool metadata file instead of searching for a metadata file",
 )
 @click.argument("version", required=False)
-def build(
+def build_cmd(
     include_libraries,
     jobs,
     sram,
@@ -415,39 +420,23 @@ def build(
     """
 
     version = check_version(version, tool_metadata_file_path, rich.console.Console())
-
-    build_directory = os.path.join(get_volare_dir(pdk_root), "build", version)
-    get_open_pdks(version, build_directory, jobs)
-    get_sky130(include_libraries, build_directory, jobs)
-    build_sky130_timing(build_directory, jobs)
-    build_sky130(sram, build_directory, jobs)
-    install_sky130(build_directory, pdk_root, version)
-
-    if clear_build_artifacts:
-        shutil.rmtree(build_directory)
+    build(
+        pdk_root=pdk_root,
+        version=version,
+        jobs=jobs,
+        sram=sram,
+        clear_build_artifacts=clear_build_artifacts,
+        include_libraries=include_libraries,
+    )
 
 
-@click.command(hidden=True)
-@opt_pdk_root
-@opt("-o", "--owner", default="efabless", help="Repository Owner")
-@opt("-r", "--repository", default="volare", help="Repository")
-@opt(
-    "-t",
-    "--token",
-    required=(os.getenv("GITHUB_TOKEN") is None),
-    default=os.getenv("GITHUB_TOKEN"),
-    help="Github Token",
-)
-@click.argument("version")
-def push(owner, repository, token, pdk_root, version):
-    """
-    For maintainers: Package and release a build to the public.
-
-    Requires ghr: github.com/tcnksm/ghr
-
-    Parameters: <version> (required)
-    """
-
+def push(
+    pdk_root,
+    version,
+    owner=VOLARE_REPO_OWNER,
+    repository=VOLARE_REPO_NAME,
+    token=os.getenv("GITHUB_TOKEN"),
+):
     console = rich.console.Console()
 
     version_directory = get_version_dir(pdk_root, version)
@@ -494,3 +483,18 @@ def push(owner, repository, token, pdk_root, version):
         ]
     )
     console.log("Done.")
+
+
+@click.command("push", hidden=True)
+@opt_pdk_root
+@opt_push
+@click.argument("version")
+def push_cmd(owner, repository, token, pdk_root, version):
+    """
+    For maintainers: Package and release a build to the public.
+
+    Requires ghr: github.com/tcnksm/ghr
+
+    Parameters: <version> (required)
+    """
+    push(pdk_root, version, owner, repository, token)
