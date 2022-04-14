@@ -92,6 +92,7 @@ def get_current_version(pdk_root):
 
     return open(current_file).read().strip()
 
+
 @click.command("output")
 @opt_pdk_root
 def output_cmd(pdk_root):
