@@ -25,7 +25,6 @@ import rich
 import rich.tree
 import click
 import rich.progress
-from click_default_group import DefaultGroup
 
 from .git_multi_clone import mkdirp
 from .common import (

@@ -1,7 +1,12 @@
-# Volare
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) ![CI Badge](https://github.com/efabless/volare/actions/workflows/ci.yml/badge.svg?branch=main) [![Slack Invite](https://img.shields.io/badge/Community-Skywater%20PDK%20Slack-ff69b4?logo=slack)](https://invite.skywater.tools)  [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black) 
+<h1 align="center">⛰️ Volare</h1>
+<p align="center">
+    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0"/></a>
+    <img src="https://github.com/efabless/volare/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI Status" />
+    <a href="https://invite.skywater.tools"><img src="https://img.shields.io/badge/Community-Skywater%20PDK%20Slack-ff69b4?logo=slack" alt="Invite to the Skywater PDK Slack"/></a>
+    <a href="https://github.com/psf/black"><img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code Style: Black"/></a>
+</p>
 
-Volare is a version manager (and builder) for the builds of the Google/Skywater sky130 PDK using [RTimothyEdwards/open_pdks](https://github.com/RTimothyEdwards/open_pdks).
+<p align="center">Volare is a version manager (and builder) for the builds of the Google/Skywater sky130 PDK using open_pdks.</p>
 
 # Requirements
 * Python 3.6+ with PIP
@@ -12,7 +17,7 @@ python3 -m pip install --upgrade --no-cache-dir volare
 ```
 
 # About the builds
-In its current inception, volare supports builds of the sky130 PDK using [Open_PDKs](https://github.com/RTimothyEdwards/), including the following libraries:
+In its current inception, volare supports builds of the sky130 PDK using [Open_PDKs](https://github.com/RTimothyEdwards/open_pdks), including the following libraries:
 * sky130_fd_io
 * sky130_fd_pr
 * sky130_fd_sc_hd
@@ -52,7 +57,7 @@ Pre-built PDKs
 ## Downloading and Enabling PDKs
 You can enable a particular sky130 PDK by invoking `volare enable <open_pdks version>`. This will automatically download that particular version of the PDK, if found, and set it as your currently used PDK.
 
-For example, to enable open_pdks `7519dfb04400f224f140749cda44ee7de6f5e095`, you invoke `volare enable 7519dfb04400f224f140749cda44ee7de6f5e095`.
+For example, to enable open_pdks `7519dfb04400f224f140749cda44ee7de6f5e095`, you invoke `volare enable 7519dfb04400f224f140749cda44ee7de6f5e095`, as shown below:
 
 ```sh
 $ volare enable 7519dfb04400f224f140749cda44ee7de6f5e095
