@@ -17,7 +17,7 @@ python3 -m pip install --upgrade --no-cache-dir volare
 ```
 
 # About the builds
-In its current inception, volare supports builds of the sky130 PDK using [Open_PDKs](https://github.com/RTimothyEdwards/open_pdks), including the following libraries:
+In its current inception, volare supports builds of the sky130 PDK using [Open_PDKs](https://github.com/efabless/open_pdks), including the following libraries:
 * sky130_fd_io
 * sky130_fd_pr
 * sky130_fd_sc_hd

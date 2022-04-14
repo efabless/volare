@@ -30,6 +30,7 @@ from .git_multi_clone import GitMultiClone, Repository, mkdirp
 from .common import (
     opt_pdk_root,
     opt_build,
+    opt_push,
     check_version,
     get_version_dir,
     get_volare_dir,
@@ -37,7 +38,6 @@ from .common import (
     SKY130_DEFAULT_LIBRARIES,
     VOLARE_REPO_OWNER,
     VOLARE_REPO_NAME,
-    opt_push,
 )
 
 
@@ -50,7 +50,7 @@ class RepoMetadata(object):
 
 RepoMetadata.by_name = {
     "open_pdks": RepoMetadata(
-        "https://github.com/RTimothyEdwards/open_pdks",
+        "https://github.com/efabless/open_pdks",
         "34eeb2743e99d44a21c2cedd467675a2e0f3bb91",
         "master",
     ),
