@@ -478,6 +478,7 @@ def push(
             f"Volare build of sky130 with Open_PDKs {version}",
             "-commitish",
             "releases",
+            "-replace",
             tag,
             tarball_path,
         ]
