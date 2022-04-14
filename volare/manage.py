@@ -25,7 +25,6 @@ import rich
 import rich.tree
 import click
 import rich.progress
-from click_default_group import DefaultGroup
 
 from .git_multi_clone import mkdirp
 from .common import (
@@ -93,13 +92,7 @@ def get_current_version(pdk_root):
     return open(current_file).read().strip()
 
 
-@click.group(cls=DefaultGroup, default="output", default_if_no_args=True)
-def manage():
-    """Allows you to list and enable installed PDKs. (default)"""
-    pass
-
-
-@click.command()
+@click.command("output")
 @opt_pdk_root
 def output_cmd(pdk_root):
     """(Default) Outputs the currently installed PDK version."""
