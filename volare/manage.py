@@ -134,13 +134,12 @@ def path_cmd(pdk_root, version):
 
 
 def enable(
-    pdk_root: str,
-    pdk: str,
-    version: str,
+    pdk_root,
+    version,
     build_if_not_found=False,
     also_push=False,
-    build_kwargs: dict = {},
-    push_kwargs: dict = {},
+    build_kwargs={},
+    push_kwargs={},
 ):
     console = rich.console.Console()
 
@@ -159,10 +158,11 @@ def enable(
         link = get_link_of(version)
         status = requests.head(link).status_code
         if status == 404:
-            console.print(f"Version {version} not found either locally or remotely.")
             if build_if_not_found:
-                console.print("Attempting to build...")
-                build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
+                console.print(
+                    f"Version {version} not found either locally or remotely. Will attempt to build."
+                )
+                build(pdk_root=pdk_root, version=version, **build_kwargs)
                 if also_push:
                     push(pdk_root, version, **push_kwargs)
             else:
@@ -254,7 +254,7 @@ def enable_cmd(pdk_root, tool_metadata_file_path, version):
     """
     console = rich.console.Console()
     version = check_version(version, tool_metadata_file_path, console)
-    enable(pdk_root=pdk_root, pdk="sky130", version=version)
+    enable(pdk_root, version)
 
 
 @click.command("enable_or_build", hidden=True)
@@ -292,9 +292,8 @@ def enable_or_build_cmd(
     console = rich.console.Console()
     version = check_version(version, tool_metadata_file_path, console)
     enable(
-        pdk_root=pdk_root,
-        pdk="sky130",
-        version=version,
+        pdk_root,
+        version,
         build_if_not_found=True,
         also_push=also_push,
         build_kwargs={

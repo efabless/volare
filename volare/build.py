@@ -20,7 +20,6 @@ import pathlib
 import tarfile
 import tempfile
 import subprocess
-from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor
 
 import rich
@@ -370,13 +369,12 @@ def install_sky130(build_directory, pdk_root, version):
 
 # ---
 def build(
-    pdk_root: str,
-    pdk: str,
-    version: str,
-    jobs: int = 1,
-    sram: bool = True,
-    clear_build_artifacts: bool = True,
-    include_libraries: Optional[List[str]] = None,
+    pdk_root,
+    version,
+    jobs=1,
+    sram=True,
+    clear_build_artifacts=True,
+    include_libraries=None,
 ):
     if include_libraries is None:
         include_libraries = SKY130_DEFAULT_LIBRARIES
@@ -424,7 +422,6 @@ def build_cmd(
     version = check_version(version, tool_metadata_file_path, rich.console.Console())
     build(
         pdk_root=pdk_root,
-        pdk="sky130",
         version=version,
         jobs=jobs,
         sram=sram,
