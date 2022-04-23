@@ -45,7 +45,7 @@ $ volare
 To list all available pre-built PDKs, you can just invoke `volare list`.
 
 ```sh
-$ volare
+$ volare list
 Pre-built PDKs
 ├── 8fe7f760ece2bb49b1c310e60243f0558977dae5 (installed)
 ├── 7519dfb04400f224f140749cda44ee7de6f5e095
