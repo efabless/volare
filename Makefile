@@ -4,7 +4,12 @@ all: dist
 
 .PHONY: dist
 dist: venv/created
-	./setup.py sdist bdist_wheel
+	./venv/bin/python3 setup.py sdist bdist_wheel
+
+.PHONY: lint
+lint: venv/created
+	./venv/bin/black --check .
+	./venv/bin/flake8 .
 
 venv: venv/created
 venv/created: $(FILE)
@@ -13,11 +18,6 @@ venv/created: $(FILE)
 	./venv/bin/python3 -m pip install wheel
 	./venv/bin/python3 -m pip install -r $(FILE)
 	touch venv/created
-
-.PHONY: lint
-lint: venv/created
-	./venv/bin/black --check .
-	./venv/bin/flake8 .
 
 .PHONY: veryclean
 veryclean: clean
