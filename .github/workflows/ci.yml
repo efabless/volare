@@ -42,7 +42,9 @@ jobs:
         run: echo "NEW_TAG=NO_NEW_TAG" >> $GITHUB_ENV
       - name: Check for new version
         if: ${{ env.BRANCH_NAME == 'main' }}
-        run: cd ${GITHUB_WORKSPACE}/ && python3 ${GITHUB_WORKSPACE}/.github/scripts/generate_tag.py
+        run: |
+          make venv
+          cd ${GITHUB_WORKSPACE}/ && ./venv/bin/python3 .github/scripts/generate_tag.py
       - name: Tag Commit
         if: ${{ env.NEW_TAG != 'NO_NEW_TAG' }}
         uses: tvdias/github-tagger@v0.0.1
