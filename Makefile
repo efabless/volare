@@ -1,18 +1,23 @@
-FILE=./requirements.txt
+FILE=./requirements_dev.txt
 
-.PHONY: venv-dev venv
-venv-dev: FILE=./requirements_dev.txt
-venv-dev: venv
-venv:
+all: dist
+
+.PHONY: dist
+dist: venv/created
+	./venv/bin/python3 setup.py sdist bdist_wheel
+
+.PHONY: lint
+lint: venv/created
+	./venv/bin/black --check .
+	./venv/bin/flake8 .
+
+venv: venv/created
+venv/created: $(FILE)
 	rm -rf venv
 	python3 -m venv ./venv
 	./venv/bin/python3 -m pip install wheel
 	./venv/bin/python3 -m pip install -r $(FILE)
-
-.PHONY: lint
-lint:
-	./venv/bin/black --check .
-	./venv/bin/flake8 .
+	touch venv/created
 
 .PHONY: veryclean
 veryclean: clean

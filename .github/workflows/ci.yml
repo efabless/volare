@@ -15,7 +15,7 @@ jobs:
       - name: Check out Git repository
         uses: actions/checkout@v2
       - name: Install Linters
-        run: make venv-dev
+        run: make venv
       - name: Lint
         run: make lint
   push_to_pypi:
@@ -35,12 +35,9 @@ jobs:
         uses: actions/setup-python@v1
         with:
           python-version: 3.6
-      - name: Install Build Dependencies
+      - name: Build Distribution
         run: |
-          python3 -m pip install build
-      - name: Build
-        run: |
-          python3 -m build --sdist --wheel --outdir dist/ .
+          make dist
       - name: Set default for env.NEW_TAG
         run: echo "NEW_TAG=NO_NEW_TAG" >> $GITHUB_ENV
       - name: Check for new version

@@ -5,4 +5,5 @@ exclude =
     __pycache__,
     build/,
     pdk/
-    venv/
+    venv/,
+    volare/__init__.py
