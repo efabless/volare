@@ -1,16 +1,21 @@
-FILE=./requirements.txt
+FILE=./requirements_dev.txt
 
-.PHONY: venv-dev venv
-venv-dev: FILE=./requirements_dev.txt
-venv-dev: venv
-venv:
+all: dist
+
+.PHONY: dist
+dist: venv/created
+	./setup.py sdist bdist_wheel
+
+venv: venv/created
+venv/created: $(FILE)
 	rm -rf venv
 	python3 -m venv ./venv
 	./venv/bin/python3 -m pip install wheel
 	./venv/bin/python3 -m pip install -r $(FILE)
+	touch venv/created
 
 .PHONY: lint
-lint:
+lint: venv/created
 	./venv/bin/black --check .
 	./venv/bin/flake8 .
 
