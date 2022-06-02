@@ -15,7 +15,6 @@
 import os
 import sys
 import json
-import uuid
 import tarfile
 import pathlib
 import requests
