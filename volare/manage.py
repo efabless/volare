@@ -171,45 +171,44 @@ def enable(
                 )
                 exit(1)
         else:
-            tempdir = tempfile.gettempdir()
-            tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}")
-            mkdirp(tarball_directory)
-
-            tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
-            with requests.get(link, stream=True) as r:
-                with rich.progress.Progress() as p:
-                    task = p.add_task(
-                        f"Downloading pre-built tarball for {version}…",
-                        total=int(r.headers["Content-length"]),
-                    )
-                    r.raise_for_status()
-                    with open(tarball_path, "wb") as f:
-                        for chunk in r.iter_content(chunk_size=8192):
-                            p.advance(task, advance=len(chunk))
-                            f.write(chunk)
-
-                    task = p.add_task("Unpacking…")
-                    with tarfile.open(tarball_path, mode="r:*") as tf:
-                        p.update(task, total=len(tf.getmembers()))
-                        for i, file in enumerate(tf.getmembers()):
-                            p.update(task, completed=i + 1)
-                            final_path = os.path.join(version_directory, file.name)
-                            final_dir = os.path.dirname(final_path)
-                            mkdirp(final_dir)
-                            with tf.extractfile(file) as io:
-                                with open(final_path, "wb") as f:
-                                    f.write(io.read())
-
-                    for variant in SKY130_VARIANTS:
-                        variant_install_path = os.path.join(version_directory, variant)
-                        variant_sources_file = os.path.join(
-                            variant_install_path, "SOURCES"
+            with tempfile.TemporaryDirectory(suffix=".volare") as tarball_directory:
+                tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
+                with requests.get(link, stream=True) as r:
+                    with rich.progress.Progress() as p:
+                        task = p.add_task(
+                            f"Downloading pre-built tarball for {version}…",
+                            total=int(r.headers["Content-length"]),
                         )
-                        if not os.path.isfile(variant_sources_file):
-                            with open(variant_sources_file, "w") as f:
-                                print(f"open_pdks {version}", file=f)
+                        r.raise_for_status()
+                        with open(tarball_path, "wb") as f:
+                            for chunk in r.iter_content(chunk_size=8192):
+                                p.advance(task, advance=len(chunk))
+                                f.write(chunk)
 
-                    os.unlink(tarball_path)
+                        task = p.add_task("Unpacking…")
+                        with tarfile.open(tarball_path, mode="r:*") as tf:
+                            p.update(task, total=len(tf.getmembers()))
+                            for i, file in enumerate(tf.getmembers()):
+                                p.update(task, completed=i + 1)
+                                final_path = os.path.join(version_directory, file.name)
+                                final_dir = os.path.dirname(final_path)
+                                mkdirp(final_dir)
+                                with tf.extractfile(file) as io:
+                                    with open(final_path, "wb") as f:
+                                        f.write(io.read())
+
+                        for variant in SKY130_VARIANTS:
+                            variant_install_path = os.path.join(
+                                version_directory, variant
+                            )
+                            variant_sources_file = os.path.join(
+                                variant_install_path, "SOURCES"
+                            )
+                            if not os.path.isfile(variant_sources_file):
+                                with open(variant_sources_file, "w") as f:
+                                    print(f"open_pdks {version}", file=f)
+
+                        os.unlink(tarball_path)
 
     with console.status(f"Enabling version {version}…"):
         for path in final_paths:
