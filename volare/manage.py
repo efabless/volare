@@ -37,7 +37,6 @@ from .common import (
     get_versions_dir,
     get_version_dir,
     get_volare_dir,
-    get_variants,
     get_version_list,
 )
 from .build import build, push

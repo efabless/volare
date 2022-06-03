@@ -1,6 +1,4 @@
 import os
-import venv
-import uuid
 import shutil
 import subprocess
 from typing import Optional, List
@@ -9,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import rich
 from rich.progress import Progress
 
-from .git_multi_clone import GitMultiClone, Repository
+from .git_multi_clone import GitMultiClone
 from ..common import (
     RepoMetadata,
     get_version_dir,
