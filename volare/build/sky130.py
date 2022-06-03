@@ -1,55 +1,19 @@
-#!/usr/bin/env python3
-# Copyright 2022 Efabless Corporation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 import os
 import venv
 import uuid
 import shutil
-import pathlib
-import tarfile
-import tempfile
 import subprocess
 from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor
 
 import rich
-import click
 from rich.progress import Progress
 
-from .git_multi_clone import GitMultiClone, Repository, mkdirp
-from .common import (
-    opt_pdk_root,
-    opt_build,
-    opt_push,
-    check_version,
-    get_version_dir,
-    get_volare_dir,
-    SKY130_VARIANTS,
-    SKY130_DEFAULT_LIBRARIES,
-    VOLARE_REPO_OWNER,
-    VOLARE_REPO_NAME,
-)
+from .git_multi_clone import GitMultiClone, Repository
+from ..common import get_version_dir, get_volare_dir, get_variants, mkdirp, RepoMetadata
 
 
-class RepoMetadata(object):
-    def __init__(self, repo, default_commit, default_branch="main"):
-        self.repo = repo
-        self.default_commit = default_commit
-        self.default_branch = default_branch
-
-
-RepoMetadata.by_name = {
+repo_metadata = {
     "open_pdks": RepoMetadata(
         "https://github.com/efabless/open_pdks",
         "34eeb2743e99d44a21c2cedd467675a2e0f3bb91",
@@ -77,7 +41,7 @@ def get_open_pdks(version, build_directory, jobs=1):
         with Progress() as progress:
             with ThreadPoolExecutor(max_workers=jobs) as executor:
                 gmc = GitMultiClone(build_directory, progress)
-                open_pdks = RepoMetadata.by_name["open_pdks"]
+                open_pdks = repo_metadata["open_pdks"]
                 open_pdks_future = executor.submit(
                     GitMultiClone.clone,
                     gmc,
@@ -106,7 +70,7 @@ def get_sky130(include_libraries, build_directory, jobs=1):
         with Progress() as progress:
             with ThreadPoolExecutor(max_workers=jobs) as executor:
                 gmc = GitMultiClone(build_directory, progress)
-                sky130 = RepoMetadata.by_name["sky130"]
+                sky130 = repo_metadata["sky130"]
                 # TODO: Get sky130 commit from open_pdks
                 sky130_fut = executor.submit(
                     GitMultiClone.clone,
@@ -234,11 +198,11 @@ def build_sky130_timing(build_directory, jobs=1):
         exit(os.EX_DATAERR)
 
 
-def build_sky130(sram, build_directory, jobs=1):
+def build_variants(sram, build_directory, jobs=1):
     try:
         console = rich.console.Console()
 
-        magic_tag = RepoMetadata.by_name["magic"].default_commit
+        magic_tag = repo_metadata["magic"].default_commit
 
         # TODO: Get magic version from open_pdks
         magic_image = f"efabless/openlane-tools:magic-{magic_tag}-centos-7"
@@ -342,7 +306,7 @@ def build_sky130(sram, build_directory, jobs=1):
 def install_sky130(build_directory, pdk_root, version):
     console = rich.console.Console()
     with console.status("Adding build to list of installed versions…"):
-        version_directory = get_version_dir(pdk_root, version)
+        version_directory = get_version_dir(pdk_root, "sky130", version)
         if (
             os.path.exists(version_directory)
             and len(os.listdir(version_directory)) != 0
@@ -351,7 +315,7 @@ def install_sky130(build_directory, pdk_root, version):
             it = 0
             while os.path.exists(backup_path) and len(os.listdir(backup_path)) != 0:
                 it += 1
-                backup_path = get_version_dir(pdk_root, f"{version}.bk{it}")
+                backup_path = get_version_dir(pdk_root, "sky130", f"{version}.bk{it}")
             console.log(
                 f"Build already found at {version_directory}, moving to {backup_path}…"
             )
@@ -360,7 +324,7 @@ def install_sky130(build_directory, pdk_root, version):
         console.log("Copying…")
         mkdirp(version_directory)
 
-        for variant in SKY130_VARIANTS:
+        for variant in get_variants("sky130"):
             variant_build_path = os.path.join(build_directory, variant)
             variant_install_path = os.path.join(version_directory, variant)
             shutil.copytree(variant_build_path, variant_install_path)
@@ -368,137 +332,28 @@ def install_sky130(build_directory, pdk_root, version):
     console.log("Done.")
 
 
-# ---
-def build(
+def build_sky130(
     pdk_root: str,
-    pdk: str,
     version: str,
     jobs: int = 1,
     sram: bool = True,
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
 ):
-    if include_libraries is None:
-        include_libraries = SKY130_DEFAULT_LIBRARIES
-    build_directory = os.path.join(get_volare_dir(pdk_root), "build", version)
+    if include_libraries is None or len(include_libraries) == 0:
+        include_libraries = [
+            "sky130_fd_sc_hd",
+            "sky130_fd_sc_hvl",
+            "sky130_fd_io",
+            "sky130_fd_pr",
+        ]
+
+    build_directory = os.path.join(get_volare_dir(pdk_root, "sky130"), "build", version)
     get_open_pdks(version, build_directory, jobs)
     get_sky130(include_libraries, build_directory, jobs)
     build_sky130_timing(build_directory, jobs)
-    build_sky130(sram, build_directory, jobs)
+    build_variants(sram, build_directory, jobs)
     install_sky130(build_directory, pdk_root, version)
 
     if clear_build_artifacts:
         shutil.rmtree(build_directory)
-
-
-@click.command("build")
-@opt_pdk_root
-@opt_build
-@click.option(
-    "-f",
-    "--metadata-file",
-    "tool_metadata_file_path",
-    default=None,
-    help="Explicitly define a tool metadata file instead of searching for a metadata file",
-)
-@click.argument("version", required=False)
-def build_cmd(
-    include_libraries,
-    jobs,
-    sram,
-    pdk_root,
-    clear_build_artifacts,
-    tool_metadata_file_path,
-    version,
-):
-    """
-    Builds the sky130 PDK using open_pdks.
-
-    Parameters: <version> (Optional)
-
-    If a version is not given, and you run this in the top level directory of
-    tools with a tool_metadata.yml file, for example OpenLane or DFFRAM,
-    the appropriate version will be enabled automatically.
-    """
-
-    version = check_version(version, tool_metadata_file_path, rich.console.Console())
-    build(
-        pdk_root=pdk_root,
-        pdk="sky130",
-        version=version,
-        jobs=jobs,
-        sram=sram,
-        clear_build_artifacts=clear_build_artifacts,
-        include_libraries=include_libraries,
-    )
-
-
-def push(
-    pdk_root,
-    version,
-    owner=VOLARE_REPO_OWNER,
-    repository=VOLARE_REPO_NAME,
-    token=os.getenv("GITHUB_TOKEN"),
-):
-    console = rich.console.Console()
-
-    version_directory = get_version_dir(pdk_root, version)
-    if not os.path.isdir(version_directory):
-        console.print("[red]Version not found.")
-        exit(os.EX_NOINPUT)
-
-    tempdir = tempfile.gettempdir()
-    tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}", version)
-    mkdirp(tarball_directory)
-
-    tarball_path = os.path.join(tarball_directory, "default.tar.xz")
-
-    with Progress() as progress:
-        path_it = pathlib.Path(version_directory).glob("**/*")
-        files = [str(path) for path in path_it if path.is_file()]
-        task = progress.add_task("Compressing…", total=len(files))
-        with tarfile.open(tarball_path, mode="w:xz") as tf:
-            for i, file in enumerate(files):
-                progress.update(task, completed=i + 1)
-                path_in_tarball = os.path.relpath(file, version_directory)
-                tf.add(file, arcname=path_in_tarball)
-    console.log(f"Compressed to {tarball_path}.")
-
-    tag = f"sky130-{version}"
-
-    # If someone wants to rewrite this to not use ghr, please, by all means.
-    console.log("Starting upload…")
-    subprocess.check_call(
-        [
-            "ghr",
-            "-owner",
-            owner,
-            "-repository",
-            repository,
-            "-token",
-            token,
-            "-body",
-            f"Volare build of sky130 with Open_PDKs {version}",
-            "-commitish",
-            "releases",
-            "-replace",
-            tag,
-            tarball_path,
-        ]
-    )
-    console.log("Done.")
-
-
-@click.command("push", hidden=True)
-@opt_pdk_root
-@opt_push
-@click.argument("version")
-def push_cmd(owner, repository, token, pdk_root, version):
-    """
-    For maintainers: Package and release a build to the public.
-
-    Requires ghr: github.com/tcnksm/ghr
-
-    Parameters: <version> (required)
-    """
-    push(pdk_root, version, owner, repository, token)

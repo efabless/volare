@@ -15,14 +15,11 @@
 import os
 import re
 import shutil
-import pathlib
 import subprocess
 
 from rich.progress import Progress
 
-
-def mkdirp(path):
-    return pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+from ..common import mkdirp
 
 
 class Repository(object):
