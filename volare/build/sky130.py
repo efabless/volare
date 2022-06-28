@@ -26,7 +26,7 @@ repo_metadata = {
     ),
     "magic": RepoMetadata(
         "https://github.com/RTimothyEdwards/magic",
-        "d98645afc1498a41db7aff4b2e100f27e0b0bd9b",
+        "085131b090cb511d785baf52a10cf6df8a657d44",
         "master",
     ),
 }
@@ -252,25 +252,13 @@ def build_variants(sram, build_directory, jobs=1):
             )
             console.log("Done.")
 
-            console.log("Building prequisites…")
+            console.log("Building PDK Variants…")
             docker_run(
                 "sh",
                 "-c",
                 f"""
                     set +e
-                    cd open_pdks/sky130
-                    make -j{jobs} prerequisites
-                """,
-            )
-            console.log("Done.")
-
-            console.log("Building sky130A/B…")
-            docker_run(
-                "sh",
-                "-c",
-                f"""
-                    set +e
-                    cd open_pdks/sky130
+                    cd open_pdks
                     export LC_ALL=en_US.UTF-8
                     make -j{jobs}
                     make SHARED_PDKS_PATH=$PDK_ROOT install
