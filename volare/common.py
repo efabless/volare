@@ -199,7 +199,5 @@ def get_version_list(pdk: str) -> List[str]:
 
 
 def get_logs_dir() -> str:
-    logs_dir = os.getenv("VOLARE_LOGS") or os.path.join(
-        VOLARE_DEFAULT_HOME, "logs"
-    )
+    logs_dir = os.getenv("VOLARE_LOGS") or os.path.join(VOLARE_DEFAULT_HOME, "logs")
     return logs_dir

@@ -1,12 +1,15 @@
 import os
+import io
+import json
 import venv
 import uuid
 import shutil
 import subprocess
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
+import pcpp
 import rich
 from rich.progress import Progress
 
@@ -40,7 +43,9 @@ repo_metadata = {
 }
 
 
-def get_open_pdks(version, build_directory, jobs=1):
+def get_open_pdks(
+    version, build_directory, jobs=1
+) -> Tuple[Optional[str], Optional[str]]:
     try:
         console = rich.console.Console()
 
@@ -61,13 +66,43 @@ def get_open_pdks(version, build_directory, jobs=1):
 
         console.log(f"Done fetching {open_pdks_repo.name}.")
 
+        sky130_tag = None
+        magic_tag = None
+
+        try:
+            json_raw = open(f"{build_directory}/open_pdks/sky130/sky130.json").read()
+            cpp = pcpp.Preprocessor()
+            cpp.line_directive = None
+            cpp.parse(json_raw)
+            json_str = None
+            with io.StringIO() as sio:
+                cpp.write(sio)
+                json_str = sio.getvalue()
+            manifest = json.loads(json_str)
+            reference_commits = manifest["reference"]
+            magic_tag = reference_commits["magic"]
+        except FileNotFoundError:
+            console.log(
+                f"Cannot find open_pdks/sky130 JSON manifest. Default versions for sky130/magic will be used."
+            )
+        except json.JSONDecodeError:
+            console.log(
+                f"Failed to parse open_pdks/sky130 JSON manifest. Default versions for sky130/magic will be used."
+            )
+        except KeyError:
+            console.log(
+                f"Failed to extract reference commits from open_pdks/sky130 JSON manifest. Default versions for sky130/magic will be used."
+            )
+
+        return (sky130_tag, magic_tag)
+
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stderr)
         exit(os.EX_DATAERR)
 
 
-def get_sky130(include_libraries, build_directory, jobs=1):
+def get_sky130(include_libraries, build_directory, commit=None, jobs=1):
     try:
         all = "all" in include_libraries
         console = rich.console.Console()
@@ -75,16 +110,19 @@ def get_sky130(include_libraries, build_directory, jobs=1):
         sky130_repo = None
         sky130_submodules = []
 
+        sky130 = repo_metadata["sky130"]
+        sky130_commit = commit or sky130.default_commit
+        console.log(f"Using sky130 {sky130_commit}…")
+
         with Progress() as progress:
             with ThreadPoolExecutor(max_workers=jobs) as executor:
                 gmc = GitMultiClone(build_directory, progress)
-                sky130 = repo_metadata["sky130"]
                 # TODO: Get sky130 commit from open_pdks
                 sky130_fut = executor.submit(
                     GitMultiClone.clone,
                     gmc,
                     sky130.repo,
-                    sky130.default_commit,
+                    sky130_commit,
                     sky130.default_branch,
                 )
                 sky130_repo = sky130_fut.result()
@@ -115,7 +153,7 @@ def get_sky130(include_libraries, build_directory, jobs=1):
         exit(os.EX_DATAERR)
 
 
-def build_sky130_timing(build_directory, jobs=1):
+def build_sky130_timing(build_directory, log_dir, jobs=1):
     try:
         console = rich.console.Console()
         sky130_repo = Repository.from_path(
@@ -138,10 +176,6 @@ def build_sky130_timing(build_directory, jobs=1):
             venv_builder = venv.EnvBuilder(with_pip=True)
             venv_builder.create(venv_path)
         console.log("Done building venv.")
-
-        timestamp = datetime.now().strftime("timing-%Y-%m-%d-%H-%M-%S")
-        log_dir = os.path.join(get_logs_dir(), timestamp)
-        mkdirp(log_dir)
 
         with console.status("Installing python-skywater-pdk in venv…"), open(
             f"{log_dir}/venv.log", "w"
@@ -204,20 +238,17 @@ def build_sky130_timing(build_directory, jobs=1):
         exit(os.EX_DATAERR)
 
 
-def build_variants(sram, build_directory, jobs=1):
+def build_variants(sram, build_directory, magic_tag, log_dir, jobs=1):
     try:
         console = rich.console.Console()
 
-        magic_tag = repo_metadata["magic"].default_commit
+        magic_tag = magic_tag or repo_metadata["magic"].default_commit
 
-        # TODO: Get magic version from open_pdks
+        console.log(f"Using magic {magic_tag}…")
+
         magic_image = f"efabless/openlane-tools:magic-{magic_tag}-centos-7"
 
         subprocess.check_call(["docker", "pull", magic_image])
-
-        timestamp = datetime.now().strftime("open_pdks-%Y-%m-%d-%H-%M-%S")
-        log_dir = os.path.join(get_logs_dir(), timestamp)
-        mkdirp(log_dir)
 
         docker_ids = set()
 
@@ -356,11 +387,16 @@ def build_sky130(
             "sky130_fd_pr",
         ]
 
+    timestamp = datetime.now().strftime("build_sky130-%Y-%m-%d-%H-%M-%S")
+    log_dir = os.path.join(get_logs_dir(), timestamp)
+    mkdirp(log_dir)
+    print(f"Using log directory '{log_dir}'.")
+
     build_directory = os.path.join(get_volare_dir(pdk_root, "sky130"), "build", version)
-    get_open_pdks(version, build_directory, jobs)
-    get_sky130(include_libraries, build_directory, jobs)
-    build_sky130_timing(build_directory, jobs)
-    build_variants(sram, build_directory, jobs)
+    sky130_tag, magic_tag = get_open_pdks(version, build_directory, jobs)
+    get_sky130(include_libraries, build_directory, sky130_tag, jobs)
+    build_sky130_timing(build_directory, log_dir, jobs)
+    build_variants(sram, build_directory, magic_tag, log_dir, jobs)
     install_sky130(build_directory, pdk_root, version)
 
     if clear_build_artifacts:
