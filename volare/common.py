@@ -35,6 +35,7 @@ VOLARE_REPO_NAME = os.getenv("VOLARE_REPO_NAME") or "volare"
 VOLARE_REPO_ID = f"{VOLARE_REPO_OWNER}/{VOLARE_REPO_NAME}"
 VOLARE_REPO_HTTPS = f"https://github.com/{VOLARE_REPO_ID}"
 VOLARE_REPO_API = f"https://api.github.com/repos/{VOLARE_REPO_ID}"
+VOLARE_DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".volare")
 
 opt = partial(click.option, show_default=True)
 
@@ -54,7 +55,7 @@ def opt_pdk_root(function: Callable):
     function = click.option(
         "--pdk-root",
         required=False,
-        default=os.getenv("PDK_ROOT") or os.path.expanduser("~/.volare"),
+        default=os.getenv("PDK_ROOT") or VOLARE_DEFAULT_HOME,
         help="Path to the PDK root",
         show_default=True,
     )(function)
@@ -195,3 +196,10 @@ def get_version_list(pdk: str) -> List[str]:
             pdk_versions_by_pdk[family] = pdk_versions_by_pdk.get(family) or []
         pdk_versions_by_pdk[family].append(hash)
     return pdk_versions_by_pdk.get(pdk) or []
+
+
+def get_logs_dir() -> str:
+    logs_dir = os.getenv("VOLARE_LOGS") or os.path.join(
+        VOLARE_DEFAULT_HOME, "logs"
+    )
+    return logs_dir

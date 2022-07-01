@@ -3,6 +3,7 @@ import venv
 import uuid
 import shutil
 import subprocess
+from datetime import datetime
 from typing import Optional, List
 from concurrent.futures import ThreadPoolExecutor
 
@@ -10,7 +11,14 @@ import rich
 from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone, Repository
-from ..common import get_version_dir, get_volare_dir, get_variants, mkdirp, RepoMetadata
+from ..common import (
+    get_logs_dir,
+    get_version_dir,
+    get_volare_dir,
+    get_variants,
+    mkdirp,
+    RepoMetadata,
+)
 
 
 repo_metadata = {
@@ -131,11 +139,13 @@ def build_sky130_timing(build_directory, jobs=1):
             venv_builder.create(venv_path)
         console.log("Done building venv.")
 
-        mkdirp("/tmp/volare/logs")
+        timestamp = datetime.now().strftime("timing-%Y-%m-%d-%H-%M-%S")
+        log_dir = os.path.join(get_logs_dir(), timestamp)
+        mkdirp(log_dir)
 
         with console.status("Installing python-skywater-pdk in venv…"), open(
-            "/tmp/volare/logs/venv.stdout", "w"
-        ) as so, open("/tmp/volare/logs/venv.stderr", "w") as se:
+            f"{log_dir}/venv.log", "w"
+        ) as out:
             subprocess.check_call(
                 [
                     "bash",
@@ -147,19 +157,15 @@ def build_sky130_timing(build_directory, jobs=1):
                         python3 -m pip install {os.path.join(sky130_repo.path, 'scripts', 'python-skywater-pdk')}
                     """,
                 ],
-                stdout=so,
-                stderr=se,
+                stdout=out,
+                stderr=out,
             )
         console.log("Done setting up venv.")
 
         def do_submodule(submodule: str):
             submodule_cleaned = submodule.strip("/.").replace("/", "_")
             console.log(f"Processing {submodule}…")
-            with open(
-                f"/tmp/volare/logs/{submodule_cleaned}.timing.stdout", "w"
-            ) as so, open(
-                f"/tmp/volare/logs/{submodule_cleaned}.timing.stderr", "w"
-            ) as se:
+            with open(f"{log_dir}/timing.{submodule_cleaned}.log", "w") as out:
                 subprocess.check_call(
                     [
                         "bash",
@@ -173,8 +179,8 @@ def build_sky130_timing(build_directory, jobs=1):
                             python3 -m skywater_pdk.liberty {submodule} all --ccsnoise
                         """,
                     ],
-                    stdout=so,
-                    stderr=se,
+                    stdout=out,
+                    stderr=out,
                 )
             console.log(f"Done with {submodule}.")
 
@@ -209,31 +215,47 @@ def build_variants(sram, build_directory, jobs=1):
 
         subprocess.check_call(["docker", "pull", magic_image])
 
+        timestamp = datetime.now().strftime("open_pdks-%Y-%m-%d-%H-%M-%S")
+        log_dir = os.path.join(get_logs_dir(), timestamp)
+        mkdirp(log_dir)
+
         docker_ids = set()
 
-        def docker_run(*args):
+        def docker_run_sh(*args, log_to):
             nonlocal docker_ids
+            output_file = open(log_to, "w")
             container_id = str(uuid.uuid4())
             docker_ids.add(container_id)
             args = list(args)
             pdk_root_abs = os.path.abspath(build_directory)
-            subprocess.check_call(
-                [
-                    "docker",
-                    "run",
-                    "--name",
-                    container_id,
-                    "--rm",
-                    "-e",
-                    f"PDK_ROOT={pdk_root_abs}",
-                    "-v",
-                    f"{pdk_root_abs}:{pdk_root_abs}",
-                    "-w",
-                    f"{pdk_root_abs}",
-                    magic_image,
-                ]
-                + args
-            )
+            try:
+                subprocess.check_call(
+                    [
+                        "docker",
+                        "run",
+                        "--name",
+                        container_id,
+                        "--rm",
+                        "-e",
+                        f"PDK_ROOT={pdk_root_abs}",
+                        "-v",
+                        f"{pdk_root_abs}:{pdk_root_abs}",
+                        "-w",
+                        f"{pdk_root_abs}",
+                        magic_image,
+                        "sh",
+                        "-c",
+                    ]
+                    + args,
+                    stdout=output_file,
+                    stderr=output_file,
+                )
+            except subprocess.CalledProcessError as e:
+                console.log(
+                    f"An error occurred while building the PDK. Check {log_to} for more information."
+                )
+                docker_ids.remove(container_id)
+                raise e
             docker_ids.remove(container_id)
 
         sram_opt = "--enable-sram-sky130" if sram else ""
@@ -241,21 +263,18 @@ def build_variants(sram, build_directory, jobs=1):
         interrupted = None
         try:
             console.log("Configuring open_pdks…")
-            docker_run(
-                "sh",
-                "-c",
+            docker_run_sh(
                 f"""
                     set +e
                     cd open_pdks
                     ./configure --enable-sky130-pdk=$PDK_ROOT/skywater-pdk/libraries {sram_opt}
                 """,
+                log_to=os.path.join(log_dir, "config.log"),
             )
             console.log("Done.")
 
-            console.log("Building PDK Variants…")
-            docker_run(
-                "sh",
-                "-c",
+            console.log("Building variants using open_pdks…")
+            docker_run_sh(
                 f"""
                     set +e
                     cd open_pdks
@@ -263,6 +282,7 @@ def build_variants(sram, build_directory, jobs=1):
                     make -j{jobs}
                     make SHARED_PDKS_PATH=$PDK_ROOT install
                 """,
+                log_to=os.path.join(log_dir, "install.log"),
             )
         except KeyboardInterrupt as e:
             interrupted = e
@@ -270,15 +290,15 @@ def build_variants(sram, build_directory, jobs=1):
             console.log("Killing docker containers…")
             for id in docker_ids:
                 subprocess.call(["docker", "kill", id])
-        console.log("Attempting to fix ownership…")
-        docker_run(
-            "sh",
-            "-c",
+
+        console.log("Fixing file ownership…")
+        docker_run_sh(
             """
                 set +e
                 OWNERSHIP="$(stat -c "%u:%g" $PDK_ROOT)"
                 chown -R $OWNERSHIP $PDK_ROOT
             """,
+            log_to=os.path.join(log_dir, "ownership.log"),
         )
         if interrupted is not None:
             raise interrupted
