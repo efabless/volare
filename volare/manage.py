@@ -25,9 +25,10 @@ import rich.tree
 import click
 import rich.progress
 
-from .git_multi_clone import mkdirp
+from .build.git_multi_clone import mkdirp
 from .common import (
     get_link_of,
+    get_variants,
     opt,
     opt_build,
     opt_push,
@@ -36,26 +37,25 @@ from .common import (
     get_versions_dir,
     get_version_dir,
     get_volare_dir,
-    SKY130_VARIANTS,
     get_version_list,
 )
 from .build import build, push
 
 
-def get_installed_list(pdk_root):
-    versions_dir = get_versions_dir(pdk_root)
+def get_installed_list(pdk_root, pdk):
+    versions_dir = get_versions_dir(pdk_root, pdk)
     mkdirp(versions_dir)
     return os.listdir(versions_dir)
 
 
-def print_installed_list(pdk_root, console):
-    installed_list = get_installed_list(pdk_root)
-    versions_dir = get_versions_dir(pdk_root)
+def print_installed_list(pdk_root, pdk, console):
+    installed_list = get_installed_list(pdk_root, pdk)
+    versions_dir = get_versions_dir(pdk_root, pdk)
     if len(installed_list) == 0:
         console.print("[red]No PDKs installed.")
         return
 
-    version = get_current_version(pdk_root)
+    version = get_current_version(pdk_root, pdk)
 
     tree = rich.tree.Tree(f"{versions_dir}")
     for installed in installed_list:
@@ -66,10 +66,10 @@ def print_installed_list(pdk_root, console):
     console.print(tree)
 
 
-def print_remote_list(pdk_root, console, pdk_list):
-    installed_list = get_installed_list(pdk_root)
+def print_remote_list(pdk_root, pdk, console, pdk_list):
+    installed_list = get_installed_list(pdk_root, pdk)
 
-    version = get_current_version(pdk_root)
+    version = get_current_version(pdk_root, pdk)
 
     tree = rich.tree.Tree("Pre-built PDKs")
     for pdk in pdk_list:
@@ -82,8 +82,8 @@ def print_remote_list(pdk_root, console, pdk_list):
     console.print(tree)
 
 
-def get_current_version(pdk_root):
-    current_file = os.path.join(get_volare_dir(pdk_root), "current")
+def get_current_version(pdk_root, pdk):
+    current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
     pathlib.Path(current_file).touch(exist_ok=True)
@@ -93,14 +93,14 @@ def get_current_version(pdk_root):
 
 @click.command("output")
 @opt_pdk_root
-def output_cmd(pdk_root):
+def output_cmd(pdk_root, pdk):
     """(Default) Outputs the currently installed PDK version."""
 
     if sys.stdout.isatty():
         console = rich.console.Console()
-        print_installed_list(pdk_root, console)
+        print_installed_list(pdk_root, pdk, console)
     else:
-        version = get_current_version()
+        version = get_current_version(pdk)
         if version == "":
             exit(1)
         else:
@@ -109,14 +109,14 @@ def output_cmd(pdk_root):
 
 @click.command("list", hidden=True)
 @opt_pdk_root
-def list_cmd(pdk_root):
+def list_cmd(pdk_root, pdk):
     """Lists PDK versions that are remotely available. JSON if not outputting to a tty."""
 
-    pdk_versions = get_version_list()
+    pdk_versions = get_version_list(pdk)
 
     if sys.stdout.isatty():
         console = rich.console.Console()
-        print_remote_list(pdk_root, console, pdk_versions)
+        print_remote_list(pdk_root, pdk, console, pdk_versions)
     else:
         print(json.dumps(pdk_versions))
 
@@ -124,11 +124,11 @@ def list_cmd(pdk_root):
 @click.command("path")
 @opt_pdk_root
 @click.argument("version", required=False)
-def path_cmd(pdk_root, version):
+def path_cmd(pdk_root, pdk, version):
     """Prints the path of a specific pdk version installation."""
     path_to_print = pdk_root
     if version is not None:
-        path_to_print = os.path.join(get_versions_dir(pdk_root), version)
+        path_to_print = os.path.join(get_versions_dir(pdk_root, pdk), version)
     print(path_to_print, end="")
 
 
@@ -143,19 +143,19 @@ def enable(
 ):
     console = rich.console.Console()
 
-    current_file = os.path.join(get_volare_dir(pdk_root), "current")
+    current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
 
-    version_directory = get_version_dir(pdk_root, version)
+    version_directory = get_version_dir(pdk_root, pdk, version)
 
-    version_paths = [
-        os.path.join(version_directory, variant) for variant in SKY130_VARIANTS
-    ]
-    final_paths = [os.path.join(pdk_root, variant) for variant in SKY130_VARIANTS]
+    variants = get_variants(pdk)
+
+    version_paths = [os.path.join(version_directory, variant) for variant in variants]
+    final_paths = [os.path.join(pdk_root, variant) for variant in variants]
 
     if not os.path.exists(version_directory):
-        link = get_link_of(version)
+        link = get_link_of(version, pdk)
         status = requests.head(link).status_code
         if status == 404:
             console.print(f"Version {version} not found either locally or remotely.")
@@ -196,7 +196,7 @@ def enable(
                                     with open(final_path, "wb") as f:
                                         f.write(io.read())
 
-                        for variant in SKY130_VARIANTS:
+                        for variant in variants:
                             variant_install_path = os.path.join(
                                 version_directory, variant
                             )
@@ -240,7 +240,7 @@ def enable(
     help="Explicitly define a tool metadata file instead of searching for a metadata file",
 )
 @click.argument("version", required=False)
-def enable_cmd(pdk_root, tool_metadata_file_path, version):
+def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version):
     """
     Activates a given PDK version.
 
@@ -252,7 +252,7 @@ def enable_cmd(pdk_root, tool_metadata_file_path, version):
     """
     console = rich.console.Console()
     version = check_version(version, tool_metadata_file_path, console)
-    enable(pdk_root=pdk_root, pdk="sky130", version=version)
+    enable(pdk_root=pdk_root, pdk=pdk, version=version)
 
 
 @click.command("enable_or_build", hidden=True)
@@ -273,6 +273,7 @@ def enable_or_build_cmd(
     jobs,
     sram,
     pdk_root,
+    pdk,
     owner,
     repository,
     token,
@@ -291,7 +292,7 @@ def enable_or_build_cmd(
     version = check_version(version, tool_metadata_file_path, console)
     enable(
         pdk_root=pdk_root,
-        pdk="sky130",
+        pdk=pdk,
         version=version,
         build_if_not_found=True,
         also_push=also_push,

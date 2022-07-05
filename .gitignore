@@ -1,4 +1,5 @@
 build/
+!volare/build
 pdk/
 __pycache__
 venv/

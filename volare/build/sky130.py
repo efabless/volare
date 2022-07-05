@@ -1,55 +1,30 @@
-#!/usr/bin/env python3
-# Copyright 2022 Efabless Corporation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 import os
+import io
+import json
 import venv
 import uuid
 import shutil
-import pathlib
-import tarfile
-import tempfile
 import subprocess
-from typing import Optional, List
+from datetime import datetime
+from typing import Optional, List, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
+import pcpp
 import rich
-import click
 from rich.progress import Progress
 
-from .git_multi_clone import GitMultiClone, Repository, mkdirp
-from .common import (
-    opt_pdk_root,
-    opt_build,
-    opt_push,
-    check_version,
+from .git_multi_clone import GitMultiClone, Repository
+from ..common import (
+    get_logs_dir,
     get_version_dir,
     get_volare_dir,
-    SKY130_VARIANTS,
-    SKY130_DEFAULT_LIBRARIES,
-    VOLARE_REPO_OWNER,
-    VOLARE_REPO_NAME,
+    get_variants,
+    mkdirp,
+    RepoMetadata,
 )
 
 
-class RepoMetadata(object):
-    def __init__(self, repo, default_commit, default_branch="main"):
-        self.repo = repo
-        self.default_commit = default_commit
-        self.default_branch = default_branch
-
-
-RepoMetadata.by_name = {
+repo_metadata = {
     "open_pdks": RepoMetadata(
         "https://github.com/efabless/open_pdks",
         "34eeb2743e99d44a21c2cedd467675a2e0f3bb91",
@@ -62,13 +37,15 @@ RepoMetadata.by_name = {
     ),
     "magic": RepoMetadata(
         "https://github.com/RTimothyEdwards/magic",
-        "d98645afc1498a41db7aff4b2e100f27e0b0bd9b",
+        "085131b090cb511d785baf52a10cf6df8a657d44",
         "master",
     ),
 }
 
 
-def get_open_pdks(version, build_directory, jobs=1):
+def get_open_pdks(
+    version, build_directory, jobs=1
+) -> Tuple[Optional[str], Optional[str]]:
     try:
         console = rich.console.Console()
 
@@ -77,7 +54,7 @@ def get_open_pdks(version, build_directory, jobs=1):
         with Progress() as progress:
             with ThreadPoolExecutor(max_workers=jobs) as executor:
                 gmc = GitMultiClone(build_directory, progress)
-                open_pdks = RepoMetadata.by_name["open_pdks"]
+                open_pdks = repo_metadata["open_pdks"]
                 open_pdks_future = executor.submit(
                     GitMultiClone.clone,
                     gmc,
@@ -89,13 +66,43 @@ def get_open_pdks(version, build_directory, jobs=1):
 
         console.log(f"Done fetching {open_pdks_repo.name}.")
 
+        sky130_tag = None
+        magic_tag = None
+
+        try:
+            json_raw = open(f"{build_directory}/open_pdks/sky130/sky130.json").read()
+            cpp = pcpp.Preprocessor()
+            cpp.line_directive = None
+            cpp.parse(json_raw)
+            json_str = None
+            with io.StringIO() as sio:
+                cpp.write(sio)
+                json_str = sio.getvalue()
+            manifest = json.loads(json_str)
+            reference_commits = manifest["reference"]
+            magic_tag = reference_commits["magic"]
+        except FileNotFoundError:
+            console.log(
+                "Cannot find open_pdks/sky130 JSON manifest. Default versions for sky130/magic will be used."
+            )
+        except json.JSONDecodeError:
+            console.log(
+                "Failed to parse open_pdks/sky130 JSON manifest. Default versions for sky130/magic will be used."
+            )
+        except KeyError:
+            console.log(
+                "Failed to extract reference commits from open_pdks/sky130 JSON manifest. Default versions for sky130/magic will be used."
+            )
+
+        return (sky130_tag, magic_tag)
+
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stderr)
         exit(os.EX_DATAERR)
 
 
-def get_sky130(include_libraries, build_directory, jobs=1):
+def get_sky130(include_libraries, build_directory, commit=None, jobs=1):
     try:
         all = "all" in include_libraries
         console = rich.console.Console()
@@ -103,16 +110,19 @@ def get_sky130(include_libraries, build_directory, jobs=1):
         sky130_repo = None
         sky130_submodules = []
 
+        sky130 = repo_metadata["sky130"]
+        sky130_commit = commit or sky130.default_commit
+        console.log(f"Using sky130 {sky130_commit}…")
+
         with Progress() as progress:
             with ThreadPoolExecutor(max_workers=jobs) as executor:
                 gmc = GitMultiClone(build_directory, progress)
-                sky130 = RepoMetadata.by_name["sky130"]
                 # TODO: Get sky130 commit from open_pdks
                 sky130_fut = executor.submit(
                     GitMultiClone.clone,
                     gmc,
                     sky130.repo,
-                    sky130.default_commit,
+                    sky130_commit,
                     sky130.default_branch,
                 )
                 sky130_repo = sky130_fut.result()
@@ -143,7 +153,7 @@ def get_sky130(include_libraries, build_directory, jobs=1):
         exit(os.EX_DATAERR)
 
 
-def build_sky130_timing(build_directory, jobs=1):
+def build_sky130_timing(build_directory, log_dir, jobs=1):
     try:
         console = rich.console.Console()
         sky130_repo = Repository.from_path(
@@ -167,11 +177,9 @@ def build_sky130_timing(build_directory, jobs=1):
             venv_builder.create(venv_path)
         console.log("Done building venv.")
 
-        mkdirp("/tmp/volare/logs")
-
         with console.status("Installing python-skywater-pdk in venv…"), open(
-            "/tmp/volare/logs/venv.stdout", "w"
-        ) as so, open("/tmp/volare/logs/venv.stderr", "w") as se:
+            f"{log_dir}/venv.log", "w"
+        ) as out:
             subprocess.check_call(
                 [
                     "bash",
@@ -183,19 +191,15 @@ def build_sky130_timing(build_directory, jobs=1):
                         python3 -m pip install {os.path.join(sky130_repo.path, 'scripts', 'python-skywater-pdk')}
                     """,
                 ],
-                stdout=so,
-                stderr=se,
+                stdout=out,
+                stderr=out,
             )
         console.log("Done setting up venv.")
 
         def do_submodule(submodule: str):
             submodule_cleaned = submodule.strip("/.").replace("/", "_")
             console.log(f"Processing {submodule}…")
-            with open(
-                f"/tmp/volare/logs/{submodule_cleaned}.timing.stdout", "w"
-            ) as so, open(
-                f"/tmp/volare/logs/{submodule_cleaned}.timing.stderr", "w"
-            ) as se:
+            with open(f"{log_dir}/timing.{submodule_cleaned}.log", "w") as out:
                 subprocess.check_call(
                     [
                         "bash",
@@ -209,8 +213,8 @@ def build_sky130_timing(build_directory, jobs=1):
                             python3 -m skywater_pdk.liberty {submodule} all --ccsnoise
                         """,
                     ],
-                    stdout=so,
-                    stderr=se,
+                    stdout=out,
+                    stderr=out,
                 )
             console.log(f"Done with {submodule}.")
 
@@ -234,42 +238,55 @@ def build_sky130_timing(build_directory, jobs=1):
         exit(os.EX_DATAERR)
 
 
-def build_sky130(sram, build_directory, jobs=1):
+def build_variants(sram, build_directory, magic_tag, log_dir, jobs=1):
     try:
         console = rich.console.Console()
 
-        magic_tag = RepoMetadata.by_name["magic"].default_commit
+        magic_tag = magic_tag or repo_metadata["magic"].default_commit
 
-        # TODO: Get magic version from open_pdks
+        console.log(f"Using magic {magic_tag}…")
+
         magic_image = f"efabless/openlane-tools:magic-{magic_tag}-centos-7"
 
         subprocess.check_call(["docker", "pull", magic_image])
 
         docker_ids = set()
 
-        def docker_run(*args):
+        def docker_run_sh(*args, log_to):
             nonlocal docker_ids
+            output_file = open(log_to, "w")
             container_id = str(uuid.uuid4())
             docker_ids.add(container_id)
             args = list(args)
             pdk_root_abs = os.path.abspath(build_directory)
-            subprocess.check_call(
-                [
-                    "docker",
-                    "run",
-                    "--name",
-                    container_id,
-                    "--rm",
-                    "-e",
-                    f"PDK_ROOT={pdk_root_abs}",
-                    "-v",
-                    f"{pdk_root_abs}:{pdk_root_abs}",
-                    "-w",
-                    f"{pdk_root_abs}",
-                    magic_image,
-                ]
-                + args
-            )
+            try:
+                subprocess.check_call(
+                    [
+                        "docker",
+                        "run",
+                        "--name",
+                        container_id,
+                        "--rm",
+                        "-e",
+                        f"PDK_ROOT={pdk_root_abs}",
+                        "-v",
+                        f"{pdk_root_abs}:{pdk_root_abs}",
+                        "-w",
+                        f"{pdk_root_abs}",
+                        magic_image,
+                        "sh",
+                        "-c",
+                    ]
+                    + args,
+                    stdout=output_file,
+                    stderr=output_file,
+                )
+            except subprocess.CalledProcessError as e:
+                console.log(
+                    f"An error occurred while building the PDK. Check {log_to} for more information."
+                )
+                docker_ids.remove(container_id)
+                raise e
             docker_ids.remove(container_id)
 
         sram_opt = "--enable-sram-sky130" if sram else ""
@@ -277,40 +294,26 @@ def build_sky130(sram, build_directory, jobs=1):
         interrupted = None
         try:
             console.log("Configuring open_pdks…")
-            docker_run(
-                "sh",
-                "-c",
+            docker_run_sh(
                 f"""
                     set +e
                     cd open_pdks
                     ./configure --enable-sky130-pdk=$PDK_ROOT/skywater-pdk/libraries {sram_opt}
                 """,
+                log_to=os.path.join(log_dir, "config.log"),
             )
             console.log("Done.")
 
-            console.log("Building prequisites…")
-            docker_run(
-                "sh",
-                "-c",
+            console.log("Building variants using open_pdks…")
+            docker_run_sh(
                 f"""
                     set +e
-                    cd open_pdks/sky130
-                    make -j{jobs} prerequisites
-                """,
-            )
-            console.log("Done.")
-
-            console.log("Building sky130A/B…")
-            docker_run(
-                "sh",
-                "-c",
-                f"""
-                    set +e
-                    cd open_pdks/sky130
+                    cd open_pdks
                     export LC_ALL=en_US.UTF-8
                     make -j{jobs}
                     make SHARED_PDKS_PATH=$PDK_ROOT install
                 """,
+                log_to=os.path.join(log_dir, "install.log"),
             )
         except KeyboardInterrupt as e:
             interrupted = e
@@ -318,15 +321,15 @@ def build_sky130(sram, build_directory, jobs=1):
             console.log("Killing docker containers…")
             for id in docker_ids:
                 subprocess.call(["docker", "kill", id])
-        console.log("Attempting to fix ownership…")
-        docker_run(
-            "sh",
-            "-c",
+
+        console.log("Fixing file ownership…")
+        docker_run_sh(
             """
                 set +e
                 OWNERSHIP="$(stat -c "%u:%g" $PDK_ROOT)"
                 chown -R $OWNERSHIP $PDK_ROOT
             """,
+            log_to=os.path.join(log_dir, "ownership.log"),
         )
         if interrupted is not None:
             raise interrupted
@@ -342,7 +345,7 @@ def build_sky130(sram, build_directory, jobs=1):
 def install_sky130(build_directory, pdk_root, version):
     console = rich.console.Console()
     with console.status("Adding build to list of installed versions…"):
-        version_directory = get_version_dir(pdk_root, version)
+        version_directory = get_version_dir(pdk_root, "sky130", version)
         if (
             os.path.exists(version_directory)
             and len(os.listdir(version_directory)) != 0
@@ -351,7 +354,7 @@ def install_sky130(build_directory, pdk_root, version):
             it = 0
             while os.path.exists(backup_path) and len(os.listdir(backup_path)) != 0:
                 it += 1
-                backup_path = get_version_dir(pdk_root, f"{version}.bk{it}")
+                backup_path = get_version_dir(pdk_root, "sky130", f"{version}.bk{it}")
             console.log(
                 f"Build already found at {version_directory}, moving to {backup_path}…"
             )
@@ -360,7 +363,7 @@ def install_sky130(build_directory, pdk_root, version):
         console.log("Copying…")
         mkdirp(version_directory)
 
-        for variant in SKY130_VARIANTS:
+        for variant in get_variants("sky130"):
             variant_build_path = os.path.join(build_directory, variant)
             variant_install_path = os.path.join(version_directory, variant)
             shutil.copytree(variant_build_path, variant_install_path)
@@ -368,137 +371,33 @@ def install_sky130(build_directory, pdk_root, version):
     console.log("Done.")
 
 
-# ---
-def build(
+def build_sky130(
     pdk_root: str,
-    pdk: str,
     version: str,
     jobs: int = 1,
     sram: bool = True,
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
 ):
-    if include_libraries is None:
-        include_libraries = SKY130_DEFAULT_LIBRARIES
-    build_directory = os.path.join(get_volare_dir(pdk_root), "build", version)
-    get_open_pdks(version, build_directory, jobs)
-    get_sky130(include_libraries, build_directory, jobs)
-    build_sky130_timing(build_directory, jobs)
-    build_sky130(sram, build_directory, jobs)
+    if include_libraries is None or len(include_libraries) == 0:
+        include_libraries = [
+            "sky130_fd_sc_hd",
+            "sky130_fd_sc_hvl",
+            "sky130_fd_io",
+            "sky130_fd_pr",
+        ]
+
+    timestamp = datetime.now().strftime("build_sky130-%Y-%m-%d-%H-%M-%S")
+    log_dir = os.path.join(get_logs_dir(), timestamp)
+    mkdirp(log_dir)
+    print(f"Using log directory '{log_dir}'.")
+
+    build_directory = os.path.join(get_volare_dir(pdk_root, "sky130"), "build", version)
+    sky130_tag, magic_tag = get_open_pdks(version, build_directory, jobs)
+    get_sky130(include_libraries, build_directory, sky130_tag, jobs)
+    build_sky130_timing(build_directory, log_dir, jobs)
+    build_variants(sram, build_directory, magic_tag, log_dir, jobs)
     install_sky130(build_directory, pdk_root, version)
 
     if clear_build_artifacts:
         shutil.rmtree(build_directory)
-
-
-@click.command("build")
-@opt_pdk_root
-@opt_build
-@click.option(
-    "-f",
-    "--metadata-file",
-    "tool_metadata_file_path",
-    default=None,
-    help="Explicitly define a tool metadata file instead of searching for a metadata file",
-)
-@click.argument("version", required=False)
-def build_cmd(
-    include_libraries,
-    jobs,
-    sram,
-    pdk_root,
-    clear_build_artifacts,
-    tool_metadata_file_path,
-    version,
-):
-    """
-    Builds the sky130 PDK using open_pdks.
-
-    Parameters: <version> (Optional)
-
-    If a version is not given, and you run this in the top level directory of
-    tools with a tool_metadata.yml file, for example OpenLane or DFFRAM,
-    the appropriate version will be enabled automatically.
-    """
-
-    version = check_version(version, tool_metadata_file_path, rich.console.Console())
-    build(
-        pdk_root=pdk_root,
-        pdk="sky130",
-        version=version,
-        jobs=jobs,
-        sram=sram,
-        clear_build_artifacts=clear_build_artifacts,
-        include_libraries=include_libraries,
-    )
-
-
-def push(
-    pdk_root,
-    version,
-    owner=VOLARE_REPO_OWNER,
-    repository=VOLARE_REPO_NAME,
-    token=os.getenv("GITHUB_TOKEN"),
-):
-    console = rich.console.Console()
-
-    version_directory = get_version_dir(pdk_root, version)
-    if not os.path.isdir(version_directory):
-        console.print("[red]Version not found.")
-        exit(os.EX_NOINPUT)
-
-    tempdir = tempfile.gettempdir()
-    tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}", version)
-    mkdirp(tarball_directory)
-
-    tarball_path = os.path.join(tarball_directory, "default.tar.xz")
-
-    with Progress() as progress:
-        path_it = pathlib.Path(version_directory).glob("**/*")
-        files = [str(path) for path in path_it if path.is_file()]
-        task = progress.add_task("Compressing…", total=len(files))
-        with tarfile.open(tarball_path, mode="w:xz") as tf:
-            for i, file in enumerate(files):
-                progress.update(task, completed=i + 1)
-                path_in_tarball = os.path.relpath(file, version_directory)
-                tf.add(file, arcname=path_in_tarball)
-    console.log(f"Compressed to {tarball_path}.")
-
-    tag = f"sky130-{version}"
-
-    # If someone wants to rewrite this to not use ghr, please, by all means.
-    console.log("Starting upload…")
-    subprocess.check_call(
-        [
-            "ghr",
-            "-owner",
-            owner,
-            "-repository",
-            repository,
-            "-token",
-            token,
-            "-body",
-            f"Volare build of sky130 with Open_PDKs {version}",
-            "-commitish",
-            "releases",
-            "-replace",
-            tag,
-            tarball_path,
-        ]
-    )
-    console.log("Done.")
-
-
-@click.command("push", hidden=True)
-@opt_pdk_root
-@opt_push
-@click.argument("version")
-def push_cmd(owner, repository, token, pdk_root, version):
-    """
-    For maintainers: Package and release a build to the public.
-
-    Requires ghr: github.com/tcnksm/ghr
-
-    Parameters: <version> (required)
-    """
-    push(pdk_root, version, owner, repository, token)
