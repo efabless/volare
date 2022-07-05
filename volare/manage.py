@@ -71,7 +71,7 @@ def print_remote_list(pdk_root, pdk, console, pdk_list):
 
     version = get_current_version(pdk_root, pdk)
 
-    tree = rich.tree.Tree("Pre-built PDKs")
+    tree = rich.tree.Tree(f"Pre-built {pdk} PDK versions")
     for pdk in pdk_list:
         if pdk == version:
             tree.add(f"[green][bold]{pdk} (enabled)")

@@ -48,7 +48,7 @@ def opt_pdk_root(function: Callable):
     function = click.option(
         "--pdk",
         required=False,
-        default=os.getenv("PDK") or "sky130",
+        default=os.getenv("PDK_FAMILY") or "sky130",
         help="The PDK family to install",
         show_default=True,
     )(function)
