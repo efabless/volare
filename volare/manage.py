@@ -281,6 +281,7 @@ def enable_or_build_cmd(
     tool_metadata_file_path,
     also_push,
     version,
+    use_repo_at,
 ):
     """
     Attempts to activate a given PDK version. If the version is not found locally or remotely,
@@ -301,6 +302,7 @@ def enable_or_build_cmd(
             "jobs": jobs,
             "sram": sram,
             "clear_build_artifacts": clear_build_artifacts,
+            "use_repo_at": use_repo_at,
         },
         push_kwargs={"owner": owner, "repository": repository, "token": token},
     )

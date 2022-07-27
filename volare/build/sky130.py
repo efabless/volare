@@ -6,14 +6,14 @@ import uuid
 import shutil
 import subprocess
 from datetime import datetime
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from concurrent.futures import ThreadPoolExecutor
 
 import pcpp
 import rich
 from rich.progress import Progress
 
-from .git_multi_clone import GitMultiClone, Repository
+from .git_multi_clone import GitMultiClone
 from ..common import (
     get_logs_dir,
     get_version_dir,
@@ -35,42 +35,42 @@ repo_metadata = {
         "f70d8ca46961ff92719d8870a18a076370b85f6c",
         "main",
     ),
-    "magic": RepoMetadata(
-        "https://github.com/RTimothyEdwards/magic",
-        "085131b090cb511d785baf52a10cf6df8a657d44",
-        "master",
-    ),
 }
+
+MAGIC_DEFAULT_TAG = "085131b090cb511d785baf52a10cf6df8a657d44"
 
 
 def get_open_pdks(
-    version, build_directory, jobs=1
-) -> Tuple[Optional[str], Optional[str]]:
+    version, build_directory, jobs=1, repo_path=None
+) -> Tuple[str, Optional[str], Optional[str]]:
     try:
         console = rich.console.Console()
 
         open_pdks_repo = None
+        if repo_path is None:
+            with Progress() as progress:
+                with ThreadPoolExecutor(max_workers=jobs) as executor:
+                    gmc = GitMultiClone(build_directory, progress)
+                    open_pdks = repo_metadata["open_pdks"]
+                    open_pdks_future = executor.submit(
+                        GitMultiClone.clone,
+                        gmc,
+                        open_pdks.repo,
+                        version,
+                        open_pdks.default_branch,
+                    )
+                    open_pdks_repo = open_pdks_future.result()
+                    repo_path = open_pdks_repo.path
 
-        with Progress() as progress:
-            with ThreadPoolExecutor(max_workers=jobs) as executor:
-                gmc = GitMultiClone(build_directory, progress)
-                open_pdks = repo_metadata["open_pdks"]
-                open_pdks_future = executor.submit(
-                    GitMultiClone.clone,
-                    gmc,
-                    open_pdks.repo,
-                    version,
-                    open_pdks.default_branch,
-                )
-                open_pdks_repo = open_pdks_future.result()
-
-        console.log(f"Done fetching {open_pdks_repo.name}.")
+            console.log(f"Done fetching {open_pdks_repo.name}.")
+        else:
+            console.log(f"Using open_pdks at {repo_path} unaltered.")
 
         sky130_tag = None
         magic_tag = None
 
         try:
-            json_raw = open(f"{build_directory}/open_pdks/sky130/sky130.json").read()
+            json_raw = open(f"{repo_path}/sky130/sky130.json").read()
             cpp = pcpp.Preprocessor()
             cpp.line_directive = None
             cpp.parse(json_raw)
@@ -94,7 +94,7 @@ def get_open_pdks(
                 "Failed to extract reference commits from open_pdks/sky130 JSON manifest. Default versions for sky130/magic will be used."
             )
 
-        return (sky130_tag, magic_tag)
+        return (repo_path, sky130_tag, magic_tag)
 
     except subprocess.CalledProcessError as e:
         print(e)
@@ -102,8 +102,13 @@ def get_open_pdks(
         exit(os.EX_DATAERR)
 
 
-def get_sky130(include_libraries, build_directory, commit=None, jobs=1):
+def get_sky130(
+    include_libraries, build_directory, commit=None, jobs=1, repo_path=None
+) -> str:
     try:
+        if repo_path is not None:
+            return repo_path
+
         all = "all" in include_libraries
         console = rich.console.Console()
 
@@ -126,6 +131,7 @@ def get_sky130(include_libraries, build_directory, commit=None, jobs=1):
                     sky130.default_branch,
                 )
                 sky130_repo = sky130_fut.result()
+                repo_path = sky130_repo.path
                 sky130_submodules = (
                     subprocess.check_output(
                         ["find", "libraries", "-type", "d", "-name", "latest"],
@@ -145,7 +151,8 @@ def get_sky130(include_libraries, build_directory, commit=None, jobs=1):
                     executor.submit(
                         GitMultiClone.clone_submodule, gmc, sky130_repo, submodule
                     )
-        console.log("Done fetching repositories.")
+        console.log("Done fetching sky130 repositories.")
+        return repo_path
 
     except subprocess.CalledProcessError as e:
         print(e)
@@ -153,17 +160,14 @@ def get_sky130(include_libraries, build_directory, commit=None, jobs=1):
         exit(os.EX_DATAERR)
 
 
-def build_sky130_timing(build_directory, log_dir, jobs=1):
+def build_sky130_timing(build_directory, sky130_path, log_dir, jobs=1):
     try:
         console = rich.console.Console()
-        sky130_repo = Repository.from_path(
-            os.path.join(build_directory, "skywater-pdk")
-        )
         sky130_submodules = (
             subprocess.check_output(
                 ["find", "./libraries", "-type", "d", "-name", "latest"],
                 stderr=subprocess.PIPE,
-                cwd=sky130_repo.path,
+                cwd=sky130_path,
             )
             .decode("utf8")
             .strip()
@@ -188,7 +192,7 @@ def build_sky130_timing(build_directory, log_dir, jobs=1):
                         set -e
                         source {venv_path}/bin/activate
                         python3 -m pip install wheel
-                        python3 -m pip install {os.path.join(sky130_repo.path, 'scripts', 'python-skywater-pdk')}
+                        python3 -m pip install {os.path.join(sky130_path, 'scripts', 'python-skywater-pdk')}
                     """,
                 ],
                 stdout=out,
@@ -207,7 +211,7 @@ def build_sky130_timing(build_directory, log_dir, jobs=1):
                         f"""
                             set -e
                             source {venv_path}/bin/activate
-                            cd {sky130_repo.path}
+                            cd {sky130_path}
                             python3 -m skywater_pdk.liberty {submodule}
                             python3 -m skywater_pdk.liberty {submodule} all
                             python3 -m skywater_pdk.liberty {submodule} all --ccsnoise
@@ -220,7 +224,7 @@ def build_sky130_timing(build_directory, log_dir, jobs=1):
 
         with ThreadPoolExecutor(max_workers=jobs) as executor:
             for submodule in sky130_submodules:
-                submodule_path = os.path.join(sky130_repo.path, submodule)
+                submodule_path = os.path.join(sky130_path, submodule)
                 if (
                     not os.path.exists(os.path.join(submodule_path, "cells"))
                     or "_sc" not in submodule
@@ -238,11 +242,13 @@ def build_sky130_timing(build_directory, log_dir, jobs=1):
         exit(os.EX_DATAERR)
 
 
-def build_variants(sram, build_directory, magic_tag, log_dir, jobs=1):
+def build_variants(
+    sram, build_directory, open_pdks_path, sky130_path, magic_tag, log_dir, jobs=1
+):
     try:
         console = rich.console.Console()
 
-        magic_tag = magic_tag or repo_metadata["magic"].default_commit
+        magic_tag = magic_tag or MAGIC_DEFAULT_TAG
 
         console.log(f"Using magic {magic_tag}…")
 
@@ -271,6 +277,14 @@ def build_variants(sram, build_directory, magic_tag, log_dir, jobs=1):
                         f"PDK_ROOT={pdk_root_abs}",
                         "-v",
                         f"{pdk_root_abs}:{pdk_root_abs}",
+                        "-e",
+                        f"SKY130_PATH={sky130_path}",
+                        "-v",
+                        f"{sky130_path}:{sky130_path}",
+                        "-e",
+                        f"OPEN_PDKS_PATH={open_pdks_path}",
+                        "-v",
+                        f"{open_pdks_path}:{open_pdks_path}",
                         "-w",
                         f"{pdk_root_abs}",
                         magic_image,
@@ -297,8 +311,8 @@ def build_variants(sram, build_directory, magic_tag, log_dir, jobs=1):
             docker_run_sh(
                 f"""
                     set +e
-                    cd open_pdks
-                    ./configure --enable-sky130-pdk=$PDK_ROOT/skywater-pdk/libraries {sram_opt}
+                    cd $OPEN_PDKS_PATH
+                    ./configure --enable-sky130-pdk=$SKY130_PATH/libraries {sram_opt}
                 """,
                 log_to=os.path.join(log_dir, "config.log"),
             )
@@ -308,7 +322,7 @@ def build_variants(sram, build_directory, magic_tag, log_dir, jobs=1):
             docker_run_sh(
                 f"""
                     set +e
-                    cd open_pdks
+                    cd $OPEN_PDKS_PATH
                     export LC_ALL=en_US.UTF-8
                     make -j{jobs}
                     make SHARED_PDKS_PATH=$PDK_ROOT install
@@ -378,6 +392,7 @@ def build_sky130(
     sram: bool = True,
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
+    using_repos: Dict[str, str] = None,
 ):
     if include_libraries is None or len(include_libraries) == 0:
         include_libraries = [
@@ -390,13 +405,21 @@ def build_sky130(
     timestamp = datetime.now().strftime("build_sky130-%Y-%m-%d-%H-%M-%S")
     log_dir = os.path.join(get_logs_dir(), timestamp)
     mkdirp(log_dir)
-    print(f"Using log directory '{log_dir}'.")
+
+    console = rich.console.Console()
+    console.log(f"Logging to '{log_dir}'…")
 
     build_directory = os.path.join(get_volare_dir(pdk_root, "sky130"), "build", version)
-    sky130_tag, magic_tag = get_open_pdks(version, build_directory, jobs)
-    get_sky130(include_libraries, build_directory, sky130_tag, jobs)
-    build_sky130_timing(build_directory, log_dir, jobs)
-    build_variants(sram, build_directory, magic_tag, log_dir, jobs)
+    open_pdks_path, sky130_tag, magic_tag = get_open_pdks(
+        version, build_directory, jobs, using_repos.get("open_pdks")
+    )
+    sky130_path = get_sky130(
+        include_libraries, build_directory, sky130_tag, jobs, using_repos.get("sky130")
+    )
+    build_sky130_timing(build_directory, sky130_path, log_dir, jobs)
+    build_variants(
+        sram, build_directory, open_pdks_path, sky130_path, magic_tag, log_dir, jobs
+    )
     install_sky130(build_directory, pdk_root, version)
 
     if clear_build_artifacts:
