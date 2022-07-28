@@ -33,7 +33,7 @@ Volare requires a so-called **PDK Root**. This PDK root can be anywhere on your 
 Simply typing `volare` in the terminal shows you your PDK Root and the PDKs you currently have installed.
 
 ```sh
-$ volare
+$ volare ls
 /home/test/.volare
 ├── 5890e791e37699239abedfd2a67e55162e25cd94 (enabled)
 ├── 660c6bdc8715dc7b3db95a1ce85392bbf2a2b195
@@ -42,10 +42,10 @@ $ volare
 ```
 
 ## Listing All Available PDKs
-To list all available pre-built PDKs, you can just invoke `volare list`.
+To list all available pre-built PDKs, you can just invoke `volare ls-remote`.
 
 ```sh
-$ volare list
+$ volare ls-remote
 Pre-built PDKs
 ├── 8fe7f760ece2bb49b1c310e60243f0558977dae5 (installed)
 ├── 7519dfb04400f224f140749cda44ee7de6f5e095

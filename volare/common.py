@@ -84,6 +84,15 @@ def opt_build(function: Callable):
         default=False,
         help="Whether or not to remove the build artifacts. Keeping the build artifacts is useful when testing.",
     )(function)
+    function = opt(
+        "-r",
+        "--use-repo-at",
+        default=None,
+        multiple=True,
+        hidden=True,
+        type=str,
+        help="Use this repository instead of cloning and checking out, in the format repo_name=/path/to/repo. You can pass it multiple times to replace multiple repos. This feature is intended for volare and PDK developers.",
+    )(function)
     return function
 
 
@@ -199,5 +208,9 @@ def get_version_list(pdk: str) -> List[str]:
 
 
 def get_logs_dir() -> str:
-    logs_dir = os.getenv("VOLARE_LOGS") or os.path.join(VOLARE_DEFAULT_HOME, "logs")
-    return logs_dir
+    if os.getenv("VOLARE_LOGS") is not None:
+        return os.environ["VOLARE_LOGS"]
+    elif os.getenv("PDK_ROOT") is not None:
+        return os.path.join(os.environ["PDK_ROOT"], "volare", "logs")
+    else:
+        return os.path.join(VOLARE_DEFAULT_HOME, "volare", "logs")

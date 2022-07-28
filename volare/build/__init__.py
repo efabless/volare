@@ -32,14 +32,33 @@ def build(
     sram: bool = True,
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
+    use_repo_at: Optional[List[str]] = None,
 ):
+    use_repos = {}
+    if use_repo_at is not None:
+        for repo in use_repo_at:
+            name, path = repo.split("=")
+            use_repos[name] = os.path.abspath(path)
+
     if pdk == "sky130":
         build_sky130(
-            pdk_root, version, jobs, sram, clear_build_artifacts, include_libraries
+            pdk_root,
+            version,
+            jobs,
+            sram,
+            clear_build_artifacts,
+            include_libraries,
+            use_repos,
         )
     elif pdk == "asap7":
         build_asap7(
-            pdk_root, version, jobs, sram, clear_build_artifacts, include_libraries
+            pdk_root,
+            version,
+            jobs,
+            sram,
+            clear_build_artifacts,
+            include_libraries,
+            use_repos,
         )
     else:
         raise Exception(f"Unsupported pdk family {pdk}")
@@ -65,6 +84,7 @@ def build_cmd(
     clear_build_artifacts,
     tool_metadata_file_path,
     version,
+    use_repo_at,
 ):
     """
     Builds the requested PDK.
@@ -85,6 +105,7 @@ def build_cmd(
         sram=sram,
         clear_build_artifacts=clear_build_artifacts,
         include_libraries=include_libraries,
+        use_repo_at=use_repo_at,
     )
 
 

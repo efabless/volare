@@ -94,22 +94,47 @@ def get_current_version(pdk_root, pdk):
 @click.command("output")
 @opt_pdk_root
 def output_cmd(pdk_root, pdk):
-    """(Default) Outputs the currently installed PDK version."""
+    """(Default) Outputs the currently enabled PDK version.
 
+    If not outputting to a tty, the output is either the version string
+    unembellished, or, if no current version is enabled, an empty output with an
+    exit code of 1.
+    """
+
+    version = get_current_version(pdk_root, pdk)
     if sys.stdout.isatty():
-        console = rich.console.Console()
-        print_installed_list(pdk_root, pdk, console)
+        if version == "":
+            print(f"No version of the PDK {pdk} is currently enabled at {pdk_root}.")
+            print(
+                "Invoke volare --help for assistance installing and enabling versions."
+            )
+            exit(1)
+        else:
+            print(f"Installed: {pdk} v{version}")
+            print(
+                "Invoke volare --help for assistance installing and enabling versions."
+            )
     else:
-        version = get_current_version(pdk)
         if version == "":
             exit(1)
         else:
             print(version, end="")
 
 
-@click.command("list", hidden=True)
+@click.command("ls")
 @opt_pdk_root
 def list_cmd(pdk_root, pdk):
+    """Lists PDK versions that are locally installed. JSON if not outputting to a tty."""
+    if sys.stdout.isatty():
+        console = rich.console.Console()
+        print_installed_list(pdk_root, pdk, console)
+    else:
+        print(json.dumps(get_installed_list(pdk_root, pdk)), end="")
+
+
+@click.command("ls-remote")
+@opt_pdk_root
+def list_remote_cmd(pdk_root, pdk):
     """Lists PDK versions that are remotely available. JSON if not outputting to a tty."""
 
     pdk_versions = get_version_list(pdk)
@@ -118,7 +143,7 @@ def list_cmd(pdk_root, pdk):
         console = rich.console.Console()
         print_remote_list(pdk_root, pdk, console, pdk_versions)
     else:
-        print(json.dumps(pdk_versions))
+        print(json.dumps(pdk_versions), end="")
 
 
 @click.command("path")
@@ -242,7 +267,7 @@ def enable(
 @click.argument("version", required=False)
 def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version):
     """
-    Activates a given PDK version.
+    Activates a given installed PDK version.
 
     Parameters: <version> (Optional)
 
@@ -281,6 +306,7 @@ def enable_or_build_cmd(
     tool_metadata_file_path,
     also_push,
     version,
+    use_repo_at,
 ):
     """
     Attempts to activate a given PDK version. If the version is not found locally or remotely,
@@ -301,6 +327,7 @@ def enable_or_build_cmd(
             "jobs": jobs,
             "sram": sram,
             "clear_build_artifacts": clear_build_artifacts,
+            "use_repo_at": use_repo_at,
         },
         push_kwargs={"owner": owner, "repository": repository, "token": token},
     )
