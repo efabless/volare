@@ -106,13 +106,13 @@ def output_cmd(pdk_root, pdk):
         if version == "":
             print(f"No version of the PDK {pdk} is currently enabled at {pdk_root}.")
             print(
-                f"Invoke volare --help for assistance installing and enabling versions."
+                "Invoke volare --help for assistance installing and enabling versions."
             )
             exit(1)
         else:
             print(f"Installed: {pdk} v{version}")
             print(
-                f"Invoke volare --help for assistance installing and enabling versions."
+                "Invoke volare --help for assistance installing and enabling versions."
             )
     else:
         if version == "":
