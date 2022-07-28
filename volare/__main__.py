@@ -17,7 +17,14 @@ from click_default_group import DefaultGroup
 
 from . import __version__
 from .build import build_cmd, push_cmd
-from .manage import output_cmd, path_cmd, list_cmd, enable_cmd, enable_or_build_cmd
+from .manage import (
+    output_cmd,
+    path_cmd,
+    list_cmd,
+    list_remote_cmd,
+    enable_cmd,
+    enable_or_build_cmd,
+)
 
 
 @click.group(
@@ -35,6 +42,7 @@ cli.add_command(build_cmd)
 cli.add_command(push_cmd)
 cli.add_command(path_cmd)
 cli.add_command(list_cmd)
+cli.add_command(list_remote_cmd)
 cli.add_command(enable_cmd)
 cli.add_command(enable_or_build_cmd)
 
