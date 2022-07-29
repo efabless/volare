@@ -188,7 +188,7 @@ def enable(
                 console.print("Attempting to build...")
                 build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
                 if also_push:
-                    push(pdk_root, version, **push_kwargs)
+                    push(pdk_root=pdk_root, pdk=pdk, version=version, **push_kwargs)
             else:
                 console.print(
                     f"[red]Version {version} not found either locally or remotely.\nTry volare build {version}."
