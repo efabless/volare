@@ -3,6 +3,7 @@ import uuid
 import pathlib
 import tarfile
 import tempfile
+import importlib
 import subprocess
 from typing import Optional, List
 
@@ -20,8 +21,7 @@ from ..common import (
     VOLARE_REPO_NAME,
     VOLARE_REPO_OWNER,
 )
-from .sky130 import build_sky130
-from .asap7 import build_asap7
+from ..families import Family
 
 
 def build(
@@ -40,28 +40,22 @@ def build(
             name, path = repo.split("=")
             use_repos[name] = os.path.abspath(path)
 
-    if pdk == "sky130":
-        build_sky130(
-            pdk_root,
-            version,
-            jobs,
-            sram,
-            clear_build_artifacts,
-            include_libraries,
-            use_repos,
-        )
-    elif pdk == "asap7":
-        build_asap7(
-            pdk_root,
-            version,
-            jobs,
-            sram,
-            clear_build_artifacts,
-            include_libraries,
-            use_repos,
-        )
-    else:
-        raise Exception(f"Unsupported pdk family {pdk}")
+    if Family.by_name[pdk] is None:
+        raise Exception(f"Unsupported PDK family '{pdk}'.")
+
+    kwargs = {
+        "pdk_root": pdk_root,
+        "version": version,
+        "jobs": jobs,
+        "sram": sram,
+        "clear_build_artifacts": clear_build_artifacts,
+        "include_libraries": include_libraries,
+        "using_repos": use_repos,
+    }
+
+    build_module = importlib.import_module(f".{pdk}", package=__name__)
+    build_function = build_module.build
+    build_function(**kwargs)
 
 
 @click.command("build")

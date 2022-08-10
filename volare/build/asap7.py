@@ -12,9 +12,9 @@ from ..common import (
     RepoMetadata,
     get_version_dir,
     get_volare_dir,
-    get_variants,
     mkdirp,
 )
+from ..families import Family
 
 repo_metadata = {
     "orfs": RepoMetadata(
@@ -113,7 +113,9 @@ def install_asap7(build_directory, pdk_root, version):
         console.log("Copying…")
         mkdirp(version_directory)
 
-        for variant in get_variants("asap7"):
+        asap7_family = Family.by_name["asap7"]
+
+        for variant in asap7_family.variants:
             variant_build_path = os.path.join(build_directory, variant)
             variant_install_path = os.path.join(version_directory, variant)
             shutil.copytree(variant_build_path, variant_install_path)
@@ -121,7 +123,7 @@ def install_asap7(build_directory, pdk_root, version):
     console.log("Done.")
 
 
-def build_asap7(
+def build(
     pdk_root: str,
     version: str,
     jobs: int = 1,

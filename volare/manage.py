@@ -28,7 +28,6 @@ import rich.progress
 from .build.git_multi_clone import mkdirp
 from .common import (
     get_link_of,
-    get_variants,
     opt,
     opt_build,
     opt_push,
@@ -40,6 +39,7 @@ from .common import (
     get_version_list,
 )
 from .build import build, push
+from .families import Family
 
 
 def get_installed_list(pdk_root, pdk):
@@ -174,7 +174,12 @@ def enable(
 
     version_directory = get_version_dir(pdk_root, pdk, version)
 
-    variants = get_variants(pdk)
+    pdk_family = Family.by_name.get(pdk)
+    if pdk_family is None:
+        print(f"Unsupported PDK family '{pdk}'.", file=sys.stderr)
+        exit(os.EX_USAGE)
+
+    variants = pdk_family.variants
 
     version_paths = [os.path.join(version_directory, variant) for variant in variants]
     final_paths = [os.path.join(pdk_root, variant) for variant in variants]
