@@ -170,14 +170,6 @@ def check_version(
     return version
 
 
-def get_variants(pdk: str) -> List[str]:
-    if pdk == "sky130":
-        return ["sky130A", "sky130B"]
-    if pdk == "asap7":
-        return ["asap7"]
-    return []
-
-
 def get_volare_dir(pdk_root: str, pdk: str) -> str:
     return os.path.join(pdk_root, "volare", pdk)
 
