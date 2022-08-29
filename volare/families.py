@@ -26,4 +26,4 @@ class Family(object):
 Family.by_name: Dict[str, Family] = {}
 Family.by_name["sky130"] = Family("sky130", ["sky130A", "sky130B"])
 Family.by_name["gf180mcu"] = Family("gf180mcu", ["gf180mcuA", "gf180mcuB", "gf180mcuC"])
-Family.by_name["asap7"] = Family("asap7", ["asap7"])
+# Family.by_name["asap7"] = Family("asap7", ["asap7"])

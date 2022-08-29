@@ -13,8 +13,28 @@
 
 # Installation
 ```sh
+# To install
 python3 -m pip install --upgrade --no-cache-dir volare
+
+# To verify it works
+volare --version
 ```
+
+## Troubleshooting
+With a typical Python 3.6 or higher installation with PIP, installing `volare` is as simple as a `pip install`. Despite that, there are some peculiarities with PIP itself: For example, you may see an error among these lines:
+
+```sh
+  WARNING: The script volare is installed in '/home/test/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+```
+
+The solution is as simple as adding something like this to your shell's profile:
+
+```sh
+export PATH="/home/test/.local/bin:$PATH"
+```
+
+Do note that the path (`/home/test/.local/bin` in this example) varies depending on your operating system and version of Python you install, and whether you use `sudo` (absolutely not recommended) or not, so ensure that you actually read the warning and add the correct path.
 
 # About the builds
 In its current inception, volare supports builds of the sky130 PDK using [Open_PDKs](https://github.com/efabless/open_pdks), including the following libraries:
@@ -29,30 +49,36 @@ All PDKs are identified by their **open_pdks** version.
 # Usage
 Volare requires a so-called **PDK Root**. This PDK root can be anywhere on your computer, but by default it's the folder `~/.volare` in your home directory. If you have the variable `PDK_ROOT` set, volare will use that instead. You can also manually override both values by supplying the `--pdk-root` commandline argument.
 
+## Listing All Available PDKs
+To list all available pre-built PDKs hosted in this repository, you can just invoke `volare ls-remote`.
+
+```sh
+$ volare ls-remote
+Pre-built sky130 PDK versions
+├── 44a43c23c81b45b8e774ae7a84899a5a778b6b0b (2022.08.16) (enabled)
+├── e8294524e5f67c533c5d0c3afa0bcc5b2a5fa066 (2022.07.29) (installed)
+├── 41c0908b47130d5675ff8484255b43f66463a7d6 (2022.04.14) (installed)
+├── 660c6bdc8715dc7b3db95a1ce85392bbf2a2b195 (2022.04.08)
+├── 5890e791e37699239abedfd2a67e55162e25cd94 (2022.04.06)
+├── 8fe7f760ece2bb49b1c310e60243f0558977dae5 (2022.04.06)
+└── 7519dfb04400f224f140749cda44ee7de6f5e095 (2022.02.10)
+```
+
+It includes a commit hash, which is the `open_pdks` version used to build this particular PDK, the date that this commit was created, and whether you already installed this PDK and/or if it is the currently enabled PDK.
+
 ## Listing Installed PDKs
 Simply typing `volare` in the terminal shows you your PDK Root and the PDKs you currently have installed.
 
 ```sh
 $ volare ls
-/home/test/.volare
-├── 5890e791e37699239abedfd2a67e55162e25cd94 (enabled)
-├── 660c6bdc8715dc7b3db95a1ce85392bbf2a2b195
-├── 05af1d05227419f0955cd98610351f4680575b95
-└── 8fe7f760ece2bb49b1c310e60243f0558977dae5
+/home/test/volare/sky130/versions
+├── 44a43c23c81b45b8e774ae7a84899a5a778b6b0b (2022.08.16) (enabled)
+├── e8294524e5f67c533c5d0c3afa0bcc5b2a5fa066 (2022.07.29)
+└── 41c0908b47130d5675ff8484255b43f66463a7d6 (2022.04.14)
 ```
 
-## Listing All Available PDKs
-To list all available pre-built PDKs, you can just invoke `volare ls-remote`.
+(If you're not connected to the Internet, the release date of the commit will not be included.)
 
-```sh
-$ volare ls-remote
-Pre-built PDKs
-├── 8fe7f760ece2bb49b1c310e60243f0558977dae5 (installed)
-├── 7519dfb04400f224f140749cda44ee7de6f5e095
-├── 660c6bdc8715dc7b3db95a1ce85392bbf2a2b195 (installed)
-├── 5890e791e37699239abedfd2a67e55162e25cd94 (enabled)
-└── 05af1d05227419f0955cd98610351f4680575b95 (installed)
-```
 
 ## Downloading and Enabling PDKs
 You can enable a particular sky130 PDK by invoking `volare enable <open_pdks version>`. This will automatically download that particular version of the PDK, if found, and set it as your currently used PDK.
@@ -66,7 +92,7 @@ Unpacking…                                                                  �
 PDK version 7519dfb04400f224f140749cda44ee7de6f5e095 enabled.
 ```
 
-What's more is: if you're using a repository with a `tool_metadata.yml` file, such as [OpenLane](https://github.com/The-OpenROAD-Project/OpenLane) or [DFFRAM](https://github.com/Cloud-V/DFFRAM), you can just invoke `volare enable` without any arguments and Volare will automatically infer the version you're looking folder.
+What's more is: if you're using a repository with a `tool_metadata.yml` file, such as [OpenLane](https://github.com/The-OpenROAD-Project/OpenLane) or [DFFRAM](https://github.com/Cloud-V/DFFRAM), you can just invoke `volare enable` without any arguments and Volare will automatically extract the version required by the utility.
 
 ## Building PDKs
 For special cases, i.e. you require other libraries, you'll have to build the PDK yourself, which Volare does support.
