@@ -16,11 +16,23 @@ import os
 import json
 import pathlib
 import requests
+import datetime
 from functools import partial
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Dict
 
 import rich
 import click
+
+VOLARE_REPO_OWNER = os.getenv("VOLARE_REPO_OWNER") or "efabless"
+VOLARE_REPO_NAME = os.getenv("VOLARE_REPO_NAME") or "volare"
+VOLARE_REPO_ID = f"{VOLARE_REPO_OWNER}/{VOLARE_REPO_NAME}"
+VOLARE_REPO_HTTPS = f"https://github.com/{VOLARE_REPO_ID}"
+VOLARE_REPO_API = f"https://api.github.com/repos/{VOLARE_REPO_ID}"
+VOLARE_DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".volare")
+
+
+def mkdirp(path):
+    return pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
 
 class RepoMetadata(object):
@@ -30,18 +42,45 @@ class RepoMetadata(object):
         self.default_branch = default_branch
 
 
-VOLARE_REPO_OWNER = os.getenv("VOLARE_REPO_OWNER") or "efabless"
-VOLARE_REPO_NAME = os.getenv("VOLARE_REPO_NAME") or "volare"
-VOLARE_REPO_ID = f"{VOLARE_REPO_OWNER}/{VOLARE_REPO_NAME}"
-VOLARE_REPO_HTTPS = f"https://github.com/{VOLARE_REPO_ID}"
-VOLARE_REPO_API = f"https://api.github.com/repos/{VOLARE_REPO_ID}"
-VOLARE_DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".volare")
+class RemoteVersion(object):
+    def __init__(self, name: str, pdk: str, creation_date: datetime.datetime):
+        self.name = name
+        self.pdk = pdk
+        self.creation_date = creation_date
+
+    def __lt__(self, rhs: "RemoteVersion"):
+        return self.creation_date < rhs.creation_date
+
+    @classmethod
+    def from_github(Self) -> Dict[str, List["RemoteVersion"]]:
+        response_str = requests.get(f"{VOLARE_REPO_API}/releases").content.decode(
+            "utf8"
+        )
+
+        releases = json.loads(response_str)
+
+        rvs_by_pdk: Dict[str, List["RemoteVersion"]] = {}
+
+        for release in releases:
+            family, hash = release["tag_name"].split("-")
+            creation_date = datetime.datetime.strptime(
+                release["published_at"], "%Y-%m-%dT%H:%M:%SZ"
+            )
+
+            remote_version = Self(hash, family, creation_date)
+
+            if rvs_by_pdk.get(family) is None:
+                rvs_by_pdk[family] = rvs_by_pdk.get(family) or []
+
+            rvs_by_pdk[family].append(remote_version)
+
+        for family in rvs_by_pdk.keys():
+            rvs_by_pdk[family].sort(reverse=True)
+
+        return rvs_by_pdk
+
 
 opt = partial(click.option, show_default=True)
-
-
-def mkdirp(path):
-    return pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
 
 def opt_pdk_root(function: Callable):
@@ -184,19 +223,6 @@ def get_version_dir(pdk_root: str, pdk: str, version: str) -> str:
 
 def get_link_of(version: str, pdk: str) -> str:
     return f"{VOLARE_REPO_HTTPS}/releases/download/{pdk}-{version}/default.tar.xz"
-
-
-def get_version_list(pdk: str) -> List[str]:
-    response_str = requests.get(f"{VOLARE_REPO_API}/releases").content.decode("utf8")
-    releases = json.loads(response_str)
-    pdk_versions = [release["tag_name"] for release in releases]
-    pdk_versions_by_pdk = {}
-    for version in pdk_versions:
-        family, hash = version.split("-")
-        if pdk_versions_by_pdk.get(family) is None:
-            pdk_versions_by_pdk[family] = pdk_versions_by_pdk.get(family) or []
-        pdk_versions_by_pdk[family].append(hash)
-    return pdk_versions_by_pdk.get(pdk) or []
 
 
 def get_logs_dir() -> str:

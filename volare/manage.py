@@ -19,14 +19,17 @@ import tarfile
 import pathlib
 import requests
 import tempfile
+from typing import List
 
 import rich
-import rich.tree
 import click
+import rich.tree
 import rich.progress
+from rich.console import Console
 
 from .build.git_multi_clone import mkdirp
 from .common import (
+    RemoteVersion,
     get_link_of,
     opt,
     opt_build,
@@ -36,19 +39,18 @@ from .common import (
     get_versions_dir,
     get_version_dir,
     get_volare_dir,
-    get_version_list,
 )
 from .build import build, push
 from .families import Family
 
 
-def get_installed_list(pdk_root, pdk):
+def get_installed_list(pdk_root: str, pdk: str):
     versions_dir = get_versions_dir(pdk_root, pdk)
     mkdirp(versions_dir)
     return os.listdir(versions_dir)
 
 
-def print_installed_list(pdk_root, pdk, console):
+def print_installed_list(pdk_root: str, pdk: str, console: Console):
     installed_list = get_installed_list(pdk_root, pdk)
     versions_dir = get_versions_dir(pdk_root, pdk)
     if len(installed_list) == 0:
@@ -66,23 +68,28 @@ def print_installed_list(pdk_root, pdk, console):
     console.print(tree)
 
 
-def print_remote_list(pdk_root, pdk, console, pdk_list):
+def print_remote_list(
+    pdk_root: str, pdk: str, console: Console, pdk_list: List[RemoteVersion]
+):
     installed_list = get_installed_list(pdk_root, pdk)
 
     version = get_current_version(pdk_root, pdk)
 
     tree = rich.tree.Tree(f"Pre-built {pdk} PDK versions")
-    for pdk in pdk_list:
-        if pdk == version:
-            tree.add(f"[green][bold]{pdk} (enabled)")
-        elif pdk in installed_list:
-            tree.add(f"[green]{pdk} (installed)")
+    for remote_version in pdk_list:
+        name = remote_version.name
+        day = remote_version.creation_date.strftime("%Y-%m-%d")
+        desc = f"{name} ({day})"
+        if name == version:
+            tree.add(f"[green][bold]{desc} (enabled)")
+        elif name in installed_list:
+            tree.add(f"[green]{desc} (installed)")
         else:
-            tree.add(pdk)
+            tree.add(desc)
     console.print(tree)
 
 
-def get_current_version(pdk_root, pdk):
+def get_current_version(pdk_root: str, pdk: str):
     current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
@@ -126,7 +133,7 @@ def output_cmd(pdk_root, pdk):
 def list_cmd(pdk_root, pdk):
     """Lists PDK versions that are locally installed. JSON if not outputting to a tty."""
     if sys.stdout.isatty():
-        console = rich.console.Console()
+        console = Console()
         print_installed_list(pdk_root, pdk, console)
     else:
         print(json.dumps(get_installed_list(pdk_root, pdk)), end="")
@@ -137,13 +144,14 @@ def list_cmd(pdk_root, pdk):
 def list_remote_cmd(pdk_root, pdk):
     """Lists PDK versions that are remotely available. JSON if not outputting to a tty."""
 
-    pdk_versions = get_version_list(pdk)
+    all_versions = RemoteVersion.from_github()
+    pdk_versions = all_versions.get(pdk) or []
 
     if sys.stdout.isatty():
-        console = rich.console.Console()
+        console = Console()
         print_remote_list(pdk_root, pdk, console, pdk_versions)
     else:
-        print(json.dumps(pdk_versions), end="")
+        print(json.dumps([version.name for version in pdk_versions]), end="")
 
 
 @click.command("path")
@@ -166,7 +174,7 @@ def enable(
     build_kwargs: dict = {},
     push_kwargs: dict = {},
 ):
-    console = rich.console.Console()
+    console = Console()
 
     current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
     current_file_dir = os.path.dirname(current_file)
@@ -280,7 +288,7 @@ def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version):
     tools with a tool_metadata.yml file, for example OpenLane or DFFRAM,
     the appropriate version will be enabled automatically.
     """
-    console = rich.console.Console()
+    console = Console()
     version = check_version(version, tool_metadata_file_path, console)
     enable(pdk_root=pdk_root, pdk=pdk, version=version)
 
@@ -319,7 +327,7 @@ def enable_or_build_cmd(
 
     Parameters: <version>
     """
-    console = rich.console.Console()
+    console = Console()
     version = check_version(version, tool_metadata_file_path, console)
     enable(
         pdk_root=pdk_root,
