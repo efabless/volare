@@ -13,10 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import re
 import json
 import pathlib
 import requests
 import datetime
+import http.client
 from functools import partial
 from typing import Optional, Callable, List, Dict
 
@@ -42,32 +44,54 @@ class RepoMetadata(object):
         self.default_branch = default_branch
 
 
-class RemoteVersion(object):
-    def __init__(self, name: str, pdk: str, creation_date: datetime.datetime):
+class Version(object):
+    def __init__(
+        self,
+        name: str,
+        pdk: str,
+        commit_date: datetime.datetime,
+        upload_date: datetime.datetime,
+    ):
         self.name = name
         self.pdk = pdk
-        self.creation_date = creation_date
 
-    def __lt__(self, rhs: "RemoteVersion"):
-        return self.creation_date < rhs.creation_date
+        # The date the open_pdks commit was created
+        self.commit_date = commit_date
+
+        # The day this version was compiled and uploaded to volare
+        self.upload_date = upload_date
+
+    def __lt__(self, rhs: "Version"):
+        return (self.commit_date or datetime.datetime.min) < (
+            rhs.commit_date or datetime.datetime.min
+        )
 
     @classmethod
-    def from_github(Self) -> Dict[str, List["RemoteVersion"]]:
+    def from_github(Self) -> Dict[str, List["Version"]]:
         response_str = requests.get(f"{VOLARE_REPO_API}/releases").content.decode(
             "utf8"
         )
 
         releases = json.loads(response_str)
 
-        rvs_by_pdk: Dict[str, List["RemoteVersion"]] = {}
+        rvs_by_pdk: Dict[str, List["Version"]] = {}
+
+        commit_rx = re.compile(r"released on ([\d\-\:TZ]+)")
 
         for release in releases:
             family, hash = release["tag_name"].split("-")
-            creation_date = datetime.datetime.strptime(
+            upload_date = datetime.datetime.strptime(
                 release["published_at"], "%Y-%m-%dT%H:%M:%SZ"
             )
+            commit_date_match = commit_rx.search(release["body"])
+            if commit_date_match is None:
+                continue  # Malformed release
 
-            remote_version = Self(hash, family, creation_date)
+            commit_date = datetime.datetime.strptime(
+                commit_date_match[1], "%Y-%m-%dT%H:%M:%SZ"
+            )
+
+            remote_version = Self(hash, family, commit_date, upload_date)
 
             if rvs_by_pdk.get(family) is None:
                 rvs_by_pdk[family] = rvs_by_pdk.get(family) or []
@@ -232,3 +256,14 @@ def get_logs_dir() -> str:
         return os.path.join(os.environ["PDK_ROOT"], "volare", "logs")
     else:
         return os.path.join(VOLARE_DEFAULT_HOME, "volare", "logs")
+
+
+def connected_to_internet():
+    conn = http.client.HTTPSConnection("1.1.1.1", timeout=5)
+    try:
+        conn.request("HEAD", "/")
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()

@@ -29,7 +29,7 @@ from rich.console import Console
 
 from .build.git_multi_clone import mkdirp
 from .common import (
-    RemoteVersion,
+    Version,
     get_link_of,
     opt,
     opt_build,
@@ -39,37 +39,61 @@ from .common import (
     get_versions_dir,
     get_version_dir,
     get_volare_dir,
+    connected_to_internet,
 )
 from .build import build, push
 from .families import Family
 
 
-def get_installed_list(pdk_root: str, pdk: str):
+def get_installed_list(pdk_root: str, pdk: str) -> List[Version]:
     versions_dir = get_versions_dir(pdk_root, pdk)
     mkdirp(versions_dir)
-    return os.listdir(versions_dir)
+    return [Version(version, pdk, None, None) for version in os.listdir(versions_dir)]
 
 
-def print_installed_list(pdk_root: str, pdk: str, console: Console):
-    installed_list = get_installed_list(pdk_root, pdk)
-    versions_dir = get_versions_dir(pdk_root, pdk)
+def print_installed_list(
+    pdk_root: str, pdk: str, console: Console, installed_list: List[Version]
+):
     if len(installed_list) == 0:
         console.print("[red]No PDKs installed.")
         return
 
+    versions = installed_list
+
+    if connected_to_internet():
+        all_remote_versions = Version.from_github()
+        remote_versions = all_remote_versions.get(pdk) or []
+        remote_version_dict = {rv.name: rv for rv in remote_versions}
+        for installed in installed_list:
+            remote_version = remote_version_dict.get(installed.name)
+            if remote_version is not None:
+                installed.commit_date = remote_version.commit_date
+                installed.upload_date = remote_version.upload_date
+        versions.sort(reverse=True)
+    else:
+        console.print(
+            "[red]You don't appear to be connected to the Internet. Date information may be unavailable."
+        )
+
     version = get_current_version(pdk_root, pdk)
 
+    versions_dir = get_versions_dir(pdk_root, pdk)
     tree = rich.tree.Tree(f"{versions_dir}")
-    for installed in installed_list:
-        if installed == version:
-            tree.add(f"[green][bold]{installed} (enabled)")
+    for installed in versions:
+        name = installed.name
+        day = "UNKNOWN"
+        if installed.commit_date is not None:
+            day = installed.commit_date.strftime("%Y.%m.%d")
+        desc = f"{installed.name} ({day})"
+        if name == version:
+            tree.add(f"[green][bold]{desc} (enabled)")
         else:
-            tree.add(installed)
+            tree.add(desc)
     console.print(tree)
 
 
 def print_remote_list(
-    pdk_root: str, pdk: str, console: Console, pdk_list: List[RemoteVersion]
+    pdk_root: str, pdk: str, console: Console, pdk_list: List[Version]
 ):
     installed_list = get_installed_list(pdk_root, pdk)
 
@@ -78,7 +102,7 @@ def print_remote_list(
     tree = rich.tree.Tree(f"Pre-built {pdk} PDK versions")
     for remote_version in pdk_list:
         name = remote_version.name
-        day = remote_version.creation_date.strftime("%Y-%m-%d")
+        day = remote_version.commit_date.strftime("%Y.%m.%d")
         desc = f"{name} ({day})"
         if name == version:
             tree.add(f"[green][bold]{desc} (enabled)")
@@ -89,7 +113,7 @@ def print_remote_list(
     console.print(tree)
 
 
-def get_current_version(pdk_root: str, pdk: str):
+def get_current_version(pdk_root: str, pdk: str) -> str:
     current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
@@ -132,11 +156,14 @@ def output_cmd(pdk_root, pdk):
 @opt_pdk_root
 def list_cmd(pdk_root, pdk):
     """Lists PDK versions that are locally installed. JSON if not outputting to a tty."""
+
+    pdk_versions = get_installed_list(pdk_root, pdk)
+
     if sys.stdout.isatty():
         console = Console()
-        print_installed_list(pdk_root, pdk, console)
+        print_installed_list(pdk_root, pdk, console, pdk_versions)
     else:
-        print(json.dumps(get_installed_list(pdk_root, pdk)), end="")
+        print(json.dumps([version.name for version in pdk_versions]), end="")
 
 
 @click.command("ls-remote")
@@ -144,7 +171,7 @@ def list_cmd(pdk_root, pdk):
 def list_remote_cmd(pdk_root, pdk):
     """Lists PDK versions that are remotely available. JSON if not outputting to a tty."""
 
-    all_versions = RemoteVersion.from_github()
+    all_versions = Version.from_github()
     pdk_versions = all_versions.get(pdk) or []
 
     if sys.stdout.isatty():
