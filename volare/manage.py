@@ -39,6 +39,7 @@ from .common import (
     get_versions_dir,
     get_version_dir,
     get_volare_dir,
+    get_date_of,
     connected_to_internet,
 )
 from .build import build, push
@@ -131,6 +132,8 @@ def output_cmd(pdk_root, pdk):
     unembellished, or, if no current version is enabled, an empty output with an
     exit code of 1.
     """
+
+    print(get_date_of("44a43c23c81b45b8e774ae7a84899a5a778b6b0b"))
 
     version = get_current_version(pdk_root, pdk)
     if sys.stdout.isatty():

@@ -20,6 +20,8 @@ from ..common import (
     get_version_dir,
     VOLARE_REPO_NAME,
     VOLARE_REPO_OWNER,
+    get_date_of,
+    date_to_iso8601,
 )
 from ..families import Family
 
@@ -139,6 +141,11 @@ def push(
 
     # If someone wants to rewrite this to not use ghr, please, by all means.
     console.log("Starting upload…")
+
+    body = f"{pdk} variants built using volare"
+    date = get_date_of(version)
+    if date is not None:
+        body = f"{pdk} variants built using open_pdks {version} (released on {date_to_iso8601(date)})"
     subprocess.check_call(
         [
             "ghr",
@@ -149,7 +156,7 @@ def push(
             "-token",
             token,
             "-body",
-            f"Volare build of {pdk} variants (v{version})",
+            body,
             "-commitish",
             "releases",
             "-replace",

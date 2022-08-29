@@ -17,7 +17,7 @@ import re
 import json
 import pathlib
 import requests
-import datetime
+from datetime import datetime
 import http.client
 from functools import partial
 from typing import Optional, Callable, List, Dict
@@ -25,12 +25,32 @@ from typing import Optional, Callable, List, Dict
 import rich
 import click
 
+# Datetime Helpers
+ISO8601_FMT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def date_to_iso8601(date: datetime) -> str:
+    return date.strftime(ISO8601_FMT)
+
+
+def date_from_iso8601(string: str) -> datetime:
+    return datetime.strptime(string, ISO8601_FMT)
+
+
+# ---
+
 VOLARE_REPO_OWNER = os.getenv("VOLARE_REPO_OWNER") or "efabless"
 VOLARE_REPO_NAME = os.getenv("VOLARE_REPO_NAME") or "volare"
 VOLARE_REPO_ID = f"{VOLARE_REPO_OWNER}/{VOLARE_REPO_NAME}"
 VOLARE_REPO_HTTPS = f"https://github.com/{VOLARE_REPO_ID}"
 VOLARE_REPO_API = f"https://api.github.com/repos/{VOLARE_REPO_ID}"
 VOLARE_DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".volare")
+
+
+OPDKS_REPO_OWNER = os.getenv("OPDKS_REPO_NAME") or "efabless"
+OPDKS_REPO_NAME = os.getenv("OPDKS_REPO_NAME") or "open_pdks"
+OPDKS_REPO_ID = f"{OPDKS_REPO_OWNER}/{OPDKS_REPO_NAME}"
+OPDKS_REPO_API = f"https://api.github.com/repos/{OPDKS_REPO_ID}"
 
 
 def mkdirp(path):
@@ -49,8 +69,8 @@ class Version(object):
         self,
         name: str,
         pdk: str,
-        commit_date: datetime.datetime,
-        upload_date: datetime.datetime,
+        commit_date: Optional[datetime],
+        upload_date: Optional[datetime],
     ):
         self.name = name
         self.pdk = pdk
@@ -62,9 +82,7 @@ class Version(object):
         self.upload_date = upload_date
 
     def __lt__(self, rhs: "Version"):
-        return (self.commit_date or datetime.datetime.min) < (
-            rhs.commit_date or datetime.datetime.min
-        )
+        return (self.commit_date or datetime.min) < (rhs.commit_date or datetime.min)
 
     @classmethod
     def from_github(Self) -> Dict[str, List["Version"]]:
@@ -80,16 +98,13 @@ class Version(object):
 
         for release in releases:
             family, hash = release["tag_name"].split("-")
-            upload_date = datetime.datetime.strptime(
-                release["published_at"], "%Y-%m-%dT%H:%M:%SZ"
-            )
-            commit_date_match = commit_rx.search(release["body"])
-            if commit_date_match is None:
-                continue  # Malformed release
 
-            commit_date = datetime.datetime.strptime(
-                commit_date_match[1], "%Y-%m-%dT%H:%M:%SZ"
-            )
+            upload_date = date_from_iso8601(release["published_at"])
+            commit_date = None
+
+            commit_date_match = commit_rx.search(release["body"])
+            if commit_date_match is not None:
+                commit_date = date_from_iso8601(commit_date_match[1])
 
             remote_version = Self(hash, family, commit_date, upload_date)
 
@@ -256,6 +271,22 @@ def get_logs_dir() -> str:
         return os.path.join(os.environ["PDK_ROOT"], "volare", "logs")
     else:
         return os.path.join(VOLARE_DEFAULT_HOME, "volare", "logs")
+
+
+def get_date_of(opdks_commit: str) -> Optional[datetime]:
+    try:
+        request = requests.get(f"{OPDKS_REPO_API}/commits/{opdks_commit}")
+        request.raise_for_status()
+    except requests.exceptions.ConnectionError:
+        return None
+    except requests.exceptions.HTTPError:
+        return None
+
+    response_str = request.content.decode("utf8")
+    response = json.loads(response_str)
+    date = response["commit"]["author"]["date"]
+    commit_date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
+    return commit_date
 
 
 def connected_to_internet():
