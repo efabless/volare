@@ -296,7 +296,7 @@ def install_gf180mcu(build_directory, pdk_root, version):
 
         gf180mcu_family = Family.by_name["gf180mcu"]
 
-        for variant in gf180mcu_family:
+        for variant in gf180mcu_family.variants:
             variant_build_path = os.path.join(build_directory, variant)
             variant_install_path = os.path.join(version_directory, variant)
             shutil.copytree(variant_build_path, variant_install_path)
