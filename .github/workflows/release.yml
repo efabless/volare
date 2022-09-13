@@ -38,7 +38,7 @@ jobs:
         run: |
           VOLARE_PATH=$(env/bin/volare path)
           PDK_FAMILY=${{ matrix.family }}
-          PDK_VERSION=$(cat $VOLARE_PATH/$PDK_FAMILY/current)
+          PDK_VERSION=$(cat $VOLARE_PATH/volare/$PDK_FAMILY/current)
           tar -C $VOLARE_PATH/$PDK_FAMILY/versions/$PDK_VERSION \
               -cvJf default.tar.xz .
           echo "PDK_VERSION=$PDK_VERSION" >> $GITHUB_ENV
