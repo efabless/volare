@@ -19,12 +19,13 @@ from ..common import (
     get_volare_dir,
     mkdirp,
     RepoMetadata,
+    OPDKS_REPO_HTTPS,
 )
 from ..families import Family
 
 repo_metadata = {
     "open_pdks": RepoMetadata(
-        "https://github.com/efabless/open_pdks",
+        OPDKS_REPO_HTTPS,
         "cc0029b45c68137aa21323912f50d2fc17eeea13",
         "master",
     ),
