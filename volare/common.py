@@ -50,6 +50,7 @@ VOLARE_DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".volare")
 OPDKS_REPO_OWNER = os.getenv("OPDKS_REPO_NAME") or "RTimothyEdwards"
 OPDKS_REPO_NAME = os.getenv("OPDKS_REPO_NAME") or "open_pdks"
 OPDKS_REPO_ID = f"{OPDKS_REPO_OWNER}/{OPDKS_REPO_NAME}"
+OPDKS_REPO_HTTPS = f"https://github.com/{OPDKS_REPO_ID}"
 OPDKS_REPO_API = f"https://api.github.com/repos/{OPDKS_REPO_ID}"
 
 
