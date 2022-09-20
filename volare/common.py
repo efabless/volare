@@ -98,6 +98,10 @@ class Version(object):
         commit_rx = re.compile(r"released on ([\d\-\:TZ]+)")
 
         for release in releases:
+            if release["draft"]:
+                continue
+            if release["prerelease"]:
+                continue
             family, hash = release["tag_name"].split("-")
 
             upload_date = date_from_iso8601(release["published_at"])
@@ -188,6 +192,9 @@ def opt_push(function: Callable):
         default=os.getenv("GITHUB_TOKEN"),
         help="Github Token",
     )(function)
+    function = opt("-p", "--pre", default=False, help="Push as pre-release")(
+        function
+    )
     return function
 
 

@@ -112,6 +112,7 @@ def push(
     owner=VOLARE_REPO_OWNER,
     repository=VOLARE_REPO_NAME,
     token=os.getenv("GITHUB_TOKEN"),
+    pre=False
 ):
     console = rich.console.Console()
 
@@ -162,7 +163,7 @@ def push(
             "-replace",
             tag,
             tarball_path,
-        ]
+        ] + ['-prerelease'] if pre else []
     )
     console.log("Done.")
 
@@ -171,7 +172,7 @@ def push(
 @opt_pdk_root
 @opt_push
 @click.argument("version")
-def push_cmd(owner, repository, token, pdk_root, pdk, version):
+def push_cmd(owner, repository, token, pre, pdk_root, pdk, version):
     """
     For maintainers: Package and release a build to the public.
 
@@ -179,4 +180,4 @@ def push_cmd(owner, repository, token, pdk_root, pdk, version):
 
     Parameters: <version> (required)
     """
-    push(pdk_root, pdk, version, owner, repository, token)
+    push(pdk_root, pdk, version, owner, repository, token, pre)
