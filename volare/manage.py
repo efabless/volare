@@ -377,6 +377,6 @@ def enable_or_build_cmd(
             "owner": owner,
             "repository": repository,
             "token": token,
-            "pre": pre
+            "pre": pre,
         },
     )
