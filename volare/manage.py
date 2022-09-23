@@ -345,6 +345,7 @@ def enable_or_build_cmd(
     owner,
     repository,
     token,
+    pre,
     clear_build_artifacts,
     tool_metadata_file_path,
     also_push,
@@ -372,5 +373,10 @@ def enable_or_build_cmd(
             "clear_build_artifacts": clear_build_artifacts,
             "use_repo_at": use_repo_at,
         },
-        push_kwargs={"owner": owner, "repository": repository, "token": token},
+        push_kwargs={
+            "owner": owner,
+            "repository": repository,
+            "token": token,
+            "pre": pre,
+        },
     )
