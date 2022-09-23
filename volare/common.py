@@ -192,7 +192,9 @@ def opt_push(function: Callable):
         default=os.getenv("GITHUB_TOKEN"),
         help="Github Token",
     )(function)
-    function = opt("--pre", default=False, help="Push as pre-release")(function)
+    function = opt(
+        "--pre/--prod", default=False, help="Push as pre-release or production"
+    )(function)
     return function
 
 
