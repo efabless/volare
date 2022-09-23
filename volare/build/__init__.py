@@ -112,7 +112,7 @@ def push(
     owner=VOLARE_REPO_OWNER,
     repository=VOLARE_REPO_NAME,
     token=os.getenv("GITHUB_TOKEN"),
-    pre=False
+    pre=False,
 ):
     console = rich.console.Console()
 
@@ -161,9 +161,12 @@ def push(
             "-commitish",
             "releases",
             "-replace",
+        ]
+        + (["-prerelease"] if pre else [])
+        + [
             tag,
             tarball_path,
-        ] + ['-prerelease'] if pre else []
+        ]
     )
     console.log("Done.")
 
