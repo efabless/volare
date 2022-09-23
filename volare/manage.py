@@ -133,8 +133,6 @@ def output_cmd(pdk_root, pdk):
     exit code of 1.
     """
 
-    print(get_date_of("44a43c23c81b45b8e774ae7a84899a5a778b6b0b"))
-
     version = get_current_version(pdk_root, pdk)
     if sys.stdout.isatty():
         if version == "":
