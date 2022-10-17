@@ -311,7 +311,7 @@ def build_variants(
             console.log("Configuring open_pdks…")
             docker_run_sh(
                 f"""
-                    set +e
+                    set -e
                     cd $OPEN_PDKS_PATH
                     ./configure --enable-sky130-pdk=$SKY130_PATH/libraries {sram_opt}
                 """,
@@ -322,7 +322,7 @@ def build_variants(
             console.log("Building variants using open_pdks…")
             docker_run_sh(
                 f"""
-                    set +e
+                    set -e
                     cd $OPEN_PDKS_PATH
                     export LC_ALL=en_US.UTF-8
                     make -j{jobs}
@@ -340,7 +340,7 @@ def build_variants(
         console.log("Fixing file ownership…")
         docker_run_sh(
             """
-                set +e
+                set -e
                 OWNERSHIP="$(stat -c "%u:%g" $PDK_ROOT)"
                 chown -R $OWNERSHIP $PDK_ROOT
             """,
