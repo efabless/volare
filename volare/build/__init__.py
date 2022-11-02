@@ -42,7 +42,7 @@ def build(
             name, path = repo.split("=")
             use_repos[name] = os.path.abspath(path)
 
-    if Family.by_name[pdk] is None:
+    if pdk not in Family.by_name:
         raise Exception(f"Unsupported PDK family '{pdk}'.")
 
     kwargs = {
