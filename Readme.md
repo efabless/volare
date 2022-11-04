@@ -10,6 +10,29 @@
 
 # Requirements
 * Python 3.6+ with PIP
+* macOS or GNU/Linux
+
+## macOS
+Get [Homebrew](https://brew.sh) then:
+
+```sh
+brew install python3
+```
+
+## Debian and Ubuntu
+Debian 10+ or Ubuntu 18.04+ is required.
+
+```sh
+apt-get update
+apt-get install python3 python3-pip xzutils
+```
+
+## RHEL and Derivatives
+RHEL 7+ or compatible operating system required.
+```sh
+yum install -y python3 python3-pip
+```
+
 
 # Installation
 ```sh

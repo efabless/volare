@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
 import click
 from click_default_group import DefaultGroup
 
@@ -45,6 +46,21 @@ cli.add_command(list_cmd)
 cli.add_command(list_remote_cmd)
 cli.add_command(enable_cmd)
 cli.add_command(enable_or_build_cmd)
+
+try:
+    import lzma  # noqa: F401
+    import ssl  # noqa: F401
+except ModuleNotFoundError as e:
+    print(
+        f"Your version of Python 3 was not built with a required module: '{e.name}'",
+        file=sys.stderr,
+    )
+    print(
+        "Please install Python 3 with all (optional) dependencies using your operating system's package manager.",
+        file=sys.stderr,
+    )
+    print("This is a fatal error. Volare will now quit.", file=sys.stderr)
+    exit(-1)
 
 
 if __name__ == "__main__":

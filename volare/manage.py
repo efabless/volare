@@ -103,11 +103,13 @@ def print_remote_list(
     for remote_version in pdk_list:
         name = remote_version.name
         day = remote_version.commit_date.strftime("%Y.%m.%d")
-        desc = f"{name} ({day})"
+        desc = f"[green]{name} ({day})"
+        if remote_version.prerelease:
+            desc = f"[red]PRE-RELEASE {desc}"
         if name == version:
-            tree.add(f"[green][bold]{desc} (enabled)")
+            tree.add(f"[bold]{desc} (enabled)")
         elif name in installed_list:
-            tree.add(f"[green]{desc} (installed)")
+            tree.add(f"{desc} (installed)")
         else:
             tree.add(desc)
     console.print(tree)
@@ -292,7 +294,7 @@ def enable(
         with open(current_file, "w") as f:
             f.write(version)
 
-    console.print(f"PDK version {version} enabled.")
+    console.print(f"Version {version} enabled for the {pdk} PDK.")
 
 
 @click.command("enable")

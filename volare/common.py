@@ -72,6 +72,7 @@ class Version(object):
         pdk: str,
         commit_date: Optional[datetime],
         upload_date: Optional[datetime],
+        prerelease: bool = False,
     ):
         self.name = name
         self.pdk = pdk
@@ -81,6 +82,9 @@ class Version(object):
 
         # The day this version was compiled and uploaded to volare
         self.upload_date = upload_date
+
+        # Is this a pre-release?
+        self.prerelease = prerelease
 
     def __lt__(self, rhs: "Version"):
         return (self.commit_date or datetime.min) < (rhs.commit_date or datetime.min)
@@ -100,8 +104,6 @@ class Version(object):
         for release in releases:
             if release["draft"]:
                 continue
-            if release["prerelease"]:
-                continue
             family, hash = release["tag_name"].split("-")
 
             upload_date = date_from_iso8601(release["published_at"])
@@ -111,7 +113,9 @@ class Version(object):
             if commit_date_match is not None:
                 commit_date = date_from_iso8601(commit_date_match[1])
 
-            remote_version = Self(hash, family, commit_date, upload_date)
+            remote_version = Self(
+                hash, family, commit_date, upload_date, release["prerelease"]
+            )
 
             if rvs_by_pdk.get(family) is None:
                 rvs_by_pdk[family] = rvs_by_pdk.get(family) or []
