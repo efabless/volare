@@ -24,7 +24,7 @@ Debian 10+ or Ubuntu 18.04+ is required.
 
 ```sh
 apt-get update
-apt-get install python3 python3-pip xzutils
+apt-get install python3 python3-pip xz-utils
 ```
 
 ## RHEL and Derivatives
@@ -34,9 +34,9 @@ yum install -y python3 python3-pip
 ```
 
 
-# Installation
+# Installation and Upgrades
 ```sh
-# To install
+# To install (or upgrade)
 python3 -m pip install --upgrade --no-cache-dir volare
 
 # To verify it works
