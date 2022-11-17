@@ -259,9 +259,10 @@ def enable(
                                 final_path = os.path.join(version_directory, file.name)
                                 final_dir = os.path.dirname(final_path)
                                 mkdirp(final_dir)
-                                with tf.extractfile(file) as io:
-                                    with open(final_path, "wb") as f:
-                                        f.write(io.read())
+                                if file.isfile():
+                                    with tf.extractfile(file) as io:
+                                        with open(final_path, "wb") as f:
+                                            f.write(io.read())
 
                         for variant in variants:
                             variant_install_path = os.path.join(
