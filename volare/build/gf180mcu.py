@@ -103,66 +103,19 @@ def get_open_pdks(
         exit(os.EX_DATAERR)
 
 
-def get_gf180mcu(
-    include_libraries, build_directory, commit=None, jobs=1, repo_path=None
-) -> str:
-    try:
-        if repo_path is not None:
-            return repo_path
-
-        all = "all" in include_libraries
-        console = rich.console.Console()
-
-        gf180mcu_repo = None
-        gf180mcu_submodules = []
-
-        gf180mcu = repo_metadata["gf180mcu"]
-        gf180mcu_commit = commit or gf180mcu.default_commit
-        console.log(f"Using gf180mcu {gf180mcu_commit}…")
-
-        with Progress() as progress:
-            with ThreadPoolExecutor(max_workers=jobs) as executor:
-                gmc = GitMultiClone(build_directory, progress)
-                gf180mcu_fut = executor.submit(
-                    GitMultiClone.clone,
-                    gmc,
-                    gf180mcu.repo,
-                    gf180mcu_commit,
-                    gf180mcu.default_branch,
-                )
-                gf180mcu_repo = gf180mcu_fut.result()
-                repo_path = gf180mcu_repo.path
-                gf180mcu_submodules = (
-                    subprocess.check_output(
-                        ["find", "libraries", "-type", "d", "-name", "latest"],
-                        stderr=subprocess.PIPE,
-                        cwd=gf180mcu_repo.path,
-                    )
-                    .decode("utf8")
-                    .strip()
-                    .split("\n")
-                )
-                gf180mcu_submodules_filtered = [
-                    sm
-                    for sm in gf180mcu_submodules
-                    if (sm.split("/")[1] in include_libraries or all)
-                ]
-                for submodule in gf180mcu_submodules_filtered:
-                    executor.submit(
-                        GitMultiClone.clone_submodule, gmc, gf180mcu_repo, submodule
-                    )
-        console.log("Done fetching gf180mcu repositories.")
-        return repo_path
-
-    except subprocess.CalledProcessError as e:
-        print(e)
-        print(e.stderr)
-        exit(os.EX_DATAERR)
+LIB_FLAG_MAP = {
+    "gf180mcu_fd_pr": "--enable-primitive-gf180mcu",
+    "gf180mcu_fd_sc_mcu7t5v0": "--enable-sc-7t5v0-gf180mcu",
+    "gf180mcu_fd_sc_mcu9t5v0": "--enable-sc-9t5v0-gf180mcu",
+    "gf180mcu_fd_io": "--enable-io-gf180mcu",
+    "gf180mcu_fd_bd_sram": "--enable-sram-gf180mcu",
+}
 
 
 def build_variants(
-    sram, build_directory, open_pdks_path, gf180mcu_path, magic_tag, log_dir, jobs=1
+    include_libraries, build_directory, open_pdks_path, magic_tag, log_dir, jobs=1
 ):
+
     try:
         console = rich.console.Console()
 
@@ -196,10 +149,6 @@ def build_variants(
                         "-v",
                         f"{pdk_root_abs}:{pdk_root_abs}",
                         "-e",
-                        f"GF180MCU_PATH={gf180mcu_path}",
-                        "-v",
-                        f"{gf180mcu_path}:{gf180mcu_path}",
-                        "-e",
                         f"OPEN_PDKS_PATH={open_pdks_path}",
                         "-v",
                         f"{open_pdks_path}:{open_pdks_path}",
@@ -221,7 +170,7 @@ def build_variants(
                 raise e
             docker_ids.remove(container_id)
 
-        sram_opt = "--enable-sram-gf180mcu" if sram else ""
+        library_flags = [LIB_FLAG_MAP[library] for library in include_libraries]
 
         interrupted = None
         try:
@@ -230,7 +179,7 @@ def build_variants(
                 f"""
                     set +e
                     cd $OPEN_PDKS_PATH
-                    ./configure --enable-gf180mcu-pdk=$GF180MCU_PATH/libraries {sram_opt}
+                    ./configure --enable-gf180mcu-pdk {' '.join(library_flags)}
                 """,
                 log_to=os.path.join(log_dir, "config.log"),
             )
@@ -335,18 +284,16 @@ def build(
     build_directory = os.path.join(
         get_volare_dir(pdk_root, "gf180mcu"), "build", version
     )
-    open_pdks_path, gf180mcu_tag, magic_tag = get_open_pdks(
+    open_pdks_path, _, magic_tag = get_open_pdks(
         version, build_directory, jobs, using_repos.get("open_pdks")
     )
-    gf180mcu_path = get_gf180mcu(
+    build_variants(
         include_libraries,
         build_directory,
-        gf180mcu_tag,
+        open_pdks_path,
+        magic_tag,
+        log_dir,
         jobs,
-        using_repos.get("gf180mcu"),
-    )
-    build_variants(
-        sram, build_directory, open_pdks_path, gf180mcu_path, magic_tag, log_dir, jobs
     )
     install_gf180mcu(build_directory, pdk_root, version)
 
