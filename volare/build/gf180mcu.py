@@ -9,7 +9,7 @@ from typing import Optional, List, Tuple, Dict
 from concurrent.futures import ThreadPoolExecutor
 
 import pcpp
-import rich
+from rich.console import Console
 from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone
@@ -43,7 +43,7 @@ def get_open_pdks(
     version, build_directory, jobs=1, repo_path=None
 ) -> Tuple[str, Optional[str], Optional[str]]:
     try:
-        console = rich.console.Console()
+        console = Console()
 
         open_pdks_repo = None
         if repo_path is None:
@@ -117,7 +117,7 @@ def build_variants(
 ):
 
     try:
-        console = rich.console.Console()
+        console = Console()
 
         magic_tag = magic_tag or MAGIC_DEFAULT_TAG
 
@@ -224,7 +224,7 @@ def build_variants(
 
 
 def install_gf180mcu(build_directory, pdk_root, version):
-    console = rich.console.Console()
+    console = Console()
     with console.status("Adding build to list of installed versions…"):
         version_directory = get_version_dir(pdk_root, "gf180mcu", version)
         if (
@@ -278,7 +278,7 @@ def build(
     log_dir = os.path.join(get_logs_dir(), timestamp)
     mkdirp(log_dir)
 
-    console = rich.console.Console()
+    console = Console()
     console.log(f"Logging to '{log_dir}'…")
 
     build_directory = os.path.join(

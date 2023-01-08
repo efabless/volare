@@ -7,8 +7,8 @@ import importlib
 import subprocess
 from typing import Optional, List
 
-import rich
 import click
+from rich.console import Console
 from rich.progress import Progress
 
 from ..common import (
@@ -92,7 +92,7 @@ def build_cmd(
     the appropriate version will be enabled automatically.
     """
 
-    version = check_version(version, tool_metadata_file_path, rich.console.Console())
+    version = check_version(version, tool_metadata_file_path, Console())
     build(
         pdk_root=pdk_root,
         pdk=pdk,
@@ -114,7 +114,7 @@ def push(
     token=os.getenv("GITHUB_TOKEN"),
     pre=False,
 ):
-    console = rich.console.Console()
+    console = Console()
 
     version_directory = get_version_dir(pdk_root, pdk, version)
     if not os.path.isdir(version_directory):

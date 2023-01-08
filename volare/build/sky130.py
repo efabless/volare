@@ -10,7 +10,7 @@ from typing import Optional, List, Tuple, Dict
 from concurrent.futures import ThreadPoolExecutor
 
 import pcpp
-import rich
+from rich.console import Console
 from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone
@@ -45,7 +45,7 @@ def get_open_pdks(
     version, build_directory, jobs=1, repo_path=None
 ) -> Tuple[str, Optional[str], Optional[str]]:
     try:
-        console = rich.console.Console()
+        console = Console()
 
         open_pdks_repo = None
         if repo_path is None:
@@ -112,7 +112,7 @@ def get_sky130(
             return repo_path
 
         all = "all" in include_libraries
-        console = rich.console.Console()
+        console = Console()
 
         sky130_repo = None
         sky130_submodules = []
@@ -163,7 +163,7 @@ def get_sky130(
 
 def build_sky130_timing(build_directory, sky130_path, log_dir, jobs=1):
     try:
-        console = rich.console.Console()
+        console = Console()
         sky130_submodules = (
             subprocess.check_output(
                 ["find", "./libraries", "-type", "d", "-name", "latest"],
@@ -247,7 +247,7 @@ def build_variants(
     sram, build_directory, open_pdks_path, sky130_path, magic_tag, log_dir, jobs=1
 ):
     try:
-        console = rich.console.Console()
+        console = Console()
 
         magic_tag = magic_tag or MAGIC_DEFAULT_TAG
 
@@ -358,7 +358,7 @@ def build_variants(
 
 
 def install_sky130(build_directory, pdk_root, version):
-    console = rich.console.Console()
+    console = Console()
     with console.status("Adding build to list of installed versions…"):
         version_directory = get_version_dir(pdk_root, "sky130", version)
         if (
@@ -409,7 +409,7 @@ def build(
     log_dir = os.path.join(get_logs_dir(), timestamp)
     mkdirp(log_dir)
 
-    console = rich.console.Console()
+    console = Console()
     console.log(f"Logging to '{log_dir}'…")
 
     build_directory = os.path.join(get_volare_dir(pdk_root, "sky130"), "build", version)
