@@ -21,7 +21,6 @@ from datetime import datetime
 from functools import partial
 from typing import Optional, Callable, List, Dict
 
-import rich
 import click
 import requests
 from rich.console import Console
