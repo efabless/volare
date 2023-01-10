@@ -16,14 +16,14 @@ import os
 import re
 import json
 import pathlib
-import requests
-from datetime import datetime
 import http.client
+from datetime import datetime
 from functools import partial
 from typing import Optional, Callable, List, Dict
 
-import rich
 import click
+import requests
+from rich.console import Console
 
 # Datetime Helpers
 ISO8601_FMT = "%Y-%m-%dT%H:%M:%SZ"
@@ -52,6 +52,9 @@ OPDKS_REPO_NAME = os.getenv("OPDKS_REPO_NAME") or "open_pdks"
 OPDKS_REPO_ID = f"{OPDKS_REPO_OWNER}/{OPDKS_REPO_NAME}"
 OPDKS_REPO_HTTPS = f"https://github.com/{OPDKS_REPO_ID}"
 OPDKS_REPO_API = f"https://api.github.com/repos/{OPDKS_REPO_ID}"
+
+# --
+VOLARE_RESOLVED_HOME = os.getenv("PDK_ROOT") or VOLARE_DEFAULT_HOME
 
 
 def mkdirp(path):
@@ -142,7 +145,7 @@ def opt_pdk_root(function: Callable):
     function = click.option(
         "--pdk-root",
         required=False,
-        default=os.getenv("PDK_ROOT") or VOLARE_DEFAULT_HOME,
+        default=VOLARE_RESOLVED_HOME,
         help="Path to the PDK root",
         show_default=True,
     )(function)
@@ -205,7 +208,7 @@ def opt_push(function: Callable):
 def check_version(
     version: Optional[str],
     tool_metadata_file_path: Optional[str],
-    console: Optional[rich.console.Console] = None,
+    console: Optional[Console] = None,
 ) -> str:
     """
     Takes an optional version and tool_metadata_file_path.
@@ -260,6 +263,10 @@ def check_version(
     return version
 
 
+def get_volare_home(pdk_root: Optional[str] = None) -> str:
+    return pdk_root or VOLARE_RESOLVED_HOME
+
+
 def get_volare_dir(pdk_root: str, pdk: str) -> str:
     return os.path.join(pdk_root, "volare", pdk)
 
@@ -279,10 +286,8 @@ def get_link_of(version: str, pdk: str) -> str:
 def get_logs_dir() -> str:
     if os.getenv("VOLARE_LOGS") is not None:
         return os.environ["VOLARE_LOGS"]
-    elif os.getenv("PDK_ROOT") is not None:
-        return os.path.join(os.environ["PDK_ROOT"], "volare", "logs")
     else:
-        return os.path.join(VOLARE_DEFAULT_HOME, "volare", "logs")
+        return os.path.join(VOLARE_RESOLVED_HOME, "volare", "logs")
 
 
 def get_date_of(opdks_commit: str) -> Optional[datetime]:
@@ -302,7 +307,7 @@ def get_date_of(opdks_commit: str) -> Optional[datetime]:
 
 
 def connected_to_internet():
-    conn = http.client.HTTPSConnection("1.1.1.1", timeout=5)
+    conn = http.client.HTTPSConnection("8.8.8.8", timeout=5)
     try:
         conn.request("HEAD", "/")
         return True

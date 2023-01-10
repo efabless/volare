@@ -4,7 +4,7 @@ import subprocess
 from typing import Optional, List, Dict
 from concurrent.futures import ThreadPoolExecutor
 
-import rich
+from rich.console import Console
 from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone
@@ -27,7 +27,7 @@ repo_metadata = {
 
 def get_orfs(version, build_directory, jobs=1):
     try:
-        console = rich.console.Console()
+        console = Console()
 
         orfs_repo = None
 
@@ -92,7 +92,7 @@ def build_variants(build_directory, jobs):
 
 
 def install_asap7(build_directory, pdk_root, version):
-    console = rich.console.Console()
+    console = Console()
     with console.status("Adding build to list of installed versions…"):
         version_directory = get_version_dir(pdk_root, "asap7", version)
         print(version_directory)
