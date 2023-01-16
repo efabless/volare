@@ -31,10 +31,10 @@ jobs:
         run: echo "REPO_URL=https://github.com/${{ github.repository }}" >> $GITHUB_ENV
       - name: Export Branch Name
         run: echo "BRANCH_NAME=${GITHUB_REF##*/}" >> $GITHUB_ENV
-      - name: Set Up Python 3.6
-        uses: actions/setup-python@v1
+      - name: Set Up Python
+        uses: actions/setup-python@v4
         with:
-          python-version: 3.6
+          python-version: "3.6"
       - name: Build Distribution
         run: |
           make dist
