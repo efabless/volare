@@ -10,6 +10,7 @@ dist: venv/created
 lint: venv/created
 	./venv/bin/black --check .
 	./venv/bin/flake8 .
+	./venv/bin/mypy .
 
 venv: venv/created
 venv/created: $(FILE)

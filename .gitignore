@@ -1,10 +1,20 @@
-build/
-!volare/build
-pdk/
-__pycache__
-venv/
-logs/
-dist/
-*.egg-info/
+# Nonsense
+.DS_Store
+Thumbs.db
+
+# IDEs
 .vscode/
 .idea/
+
+# Python
+__pycache__
+.mypy_cache/
+build/
+!volare/build
+/venv
+*.egg-info/
+dist/
+
+# Artifacts
+logs/
+pdks/
