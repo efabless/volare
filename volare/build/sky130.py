@@ -395,7 +395,7 @@ def build(
     sram: bool = True,
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
-    using_repos: Dict[str, str] = None,
+    using_repos: Optional[Dict[str, str]] = None,
 ):
     if include_libraries is None or len(include_libraries) == 0:
         include_libraries = [
@@ -404,6 +404,9 @@ def build(
             "sky130_fd_io",
             "sky130_fd_pr",
         ]
+
+    if using_repos is None:
+        using_repos = {}
 
     timestamp = datetime.now().strftime("build_sky130-%Y-%m-%d-%H-%M-%S")
     log_dir = os.path.join(get_logs_dir(), timestamp)

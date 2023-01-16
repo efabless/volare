@@ -181,6 +181,8 @@ class Repository(object):
 
         ro_rx = re.compile(r"Receiving objects:\s*(\d+)%")
 
+        assert process.stderr is not None, "Process doesn't have a stderr channel"
+
         # Python Moment #3
         buffer = ""
         while True:

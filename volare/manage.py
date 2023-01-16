@@ -102,6 +102,9 @@ def print_remote_list(
     tree = rich.tree.Tree(f"Pre-built {pdk} PDK versions")
     for remote_version in pdk_list:
         name = remote_version.name
+        assert (
+            remote_version.commit_date is not None
+        ), f"Remote version {name} has no commit date"
         day = remote_version.commit_date.strftime("%Y.%m.%d")
         desc = f"[green]{name} ({day})"
         if remote_version.prerelease:
@@ -259,9 +262,12 @@ def enable(
                                 final_path = os.path.join(version_directory, file.name)
                                 final_dir = os.path.dirname(final_path)
                                 mkdirp(final_dir)
-                                with tf.extractfile(file) as io:
-                                    with open(final_path, "wb") as f:
-                                        f.write(io.read())
+                                io = tf.extractfile(file)
+                                if io is None:
+                                    console.print("[red]Failed to unpack tarball.")
+                                    exit(1)
+                                with open(final_path, "wb") as f:
+                                    f.write(io.read())
 
                         for variant in variants:
                             variant_install_path = os.path.join(

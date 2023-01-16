@@ -8,6 +8,7 @@ requirements = open("requirements.txt").read().strip().split("\n")
 setup(
     name="volare",
     packages=find_packages(),
+    package_data={"volare": ["py.typed"]},
     version=__version__,
     description="A sky130 PDK builder/version manager",
     long_description=open("Readme.md").read(),
