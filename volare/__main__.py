@@ -14,7 +14,6 @@
 # limitations under the License.
 import sys
 import click
-from click_default_group import DefaultGroup
 
 from . import __version__
 from .build import build_cmd, push_cmd
@@ -28,11 +27,7 @@ from .manage import (
 )
 
 
-@click.group(
-    cls=DefaultGroup,
-    default="output",
-    default_if_no_args=True,
-)
+@click.group()
 @click.version_option(__version__)
 def cli():
     pass
