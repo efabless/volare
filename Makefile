@@ -1,5 +1,3 @@
-FILE=./requirements_dev.txt
-
 all: dist
 
 .PHONY: dist
@@ -13,12 +11,14 @@ lint: venv/created
 	./venv/bin/mypy .
 
 venv: venv/created
-venv/created: $(FILE)
+venv/created: ./requirements_dev.txt ./requirements.txt
 	rm -rf venv
 	python3 -m venv ./venv
 	./venv/bin/python3 -m pip install --upgrade pip
 	./venv/bin/python3 -m pip install --upgrade wheel
-	./venv/bin/python3 -m pip install --upgrade -r $(FILE)
+	./venv/bin/python3 -m pip install --upgrade\
+		-r ./requirements_dev.txt\
+		-r ./requirements.txt
 	touch venv/created
 
 .PHONY: veryclean
