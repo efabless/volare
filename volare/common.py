@@ -16,7 +16,6 @@ import os
 import re
 import json
 import pathlib
-import http.client
 from datetime import datetime
 from functools import partial
 from typing import Optional, Callable, List, Dict
@@ -304,14 +303,3 @@ def get_date_of(opdks_commit: str) -> Optional[datetime]:
     date = response["commit"]["author"]["date"]
     commit_date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
     return commit_date
-
-
-def connected_to_internet():
-    conn = http.client.HTTPSConnection("8.8.8.8", timeout=5)
-    try:
-        conn.request("HEAD", "/")
-        return True
-    except Exception:
-        return False
-    finally:
-        conn.close()

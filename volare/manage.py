@@ -19,7 +19,7 @@ import tarfile
 import pathlib
 import requests
 import tempfile
-from typing import List
+from typing import List, Optional
 
 import rich
 import click
@@ -39,7 +39,6 @@ from .common import (
     get_versions_dir,
     get_version_dir,
     get_volare_dir,
-    connected_to_internet,
 )
 from .build import build, push
 from .families import Family
@@ -60,7 +59,7 @@ def print_installed_list(
 
     versions = installed_list
 
-    if connected_to_internet():
+    try:
         all_remote_versions = Version.from_github()
         remote_versions = all_remote_versions.get(pdk) or []
         remote_version_dict = {rv.name: rv for rv in remote_versions}
@@ -70,7 +69,7 @@ def print_installed_list(
                 installed.commit_date = remote_version.commit_date
                 installed.upload_date = remote_version.upload_date
         versions.sort(reverse=True)
-    else:
+    except requests.exceptions.ConnectionError:
         console.print(
             "[red]You don't appear to be connected to the Internet. Date information may be unavailable."
         )
@@ -81,10 +80,12 @@ def print_installed_list(
     tree = rich.tree.Tree(f"{versions_dir}")
     for installed in versions:
         name = installed.name
-        day = "UNKNOWN"
+        day: Optional[str] = None
         if installed.commit_date is not None:
             day = installed.commit_date.strftime("%Y.%m.%d")
-        desc = f"{installed.name} ({day})"
+        desc = f"{installed.name}"
+        if day is not None:
+            desc += " ({day})"
         if name == version:
             tree.add(f"[green][bold]{desc} (enabled)")
         else:
@@ -130,7 +131,7 @@ def get_current_version(pdk_root: str, pdk: str) -> str:
 @click.command("output")
 @opt_pdk_root
 def output_cmd(pdk_root, pdk):
-    """(Default) Outputs the currently enabled PDK version.
+    """Outputs the currently enabled PDK version.
 
     If not outputting to a tty, the output is either the version string
     unembellished, or, if no current version is enabled, an empty output with an
@@ -176,14 +177,24 @@ def list_cmd(pdk_root, pdk):
 def list_remote_cmd(pdk_root, pdk):
     """Lists PDK versions that are remotely available. JSON if not outputting to a tty."""
 
-    all_versions = Version.from_github()
-    pdk_versions = all_versions.get(pdk) or []
+    try:
+        all_versions = Version.from_github()
+        pdk_versions = all_versions.get(pdk) or []
 
-    if sys.stdout.isatty():
-        console = Console()
-        print_remote_list(pdk_root, pdk, console, pdk_versions)
-    else:
-        print(json.dumps([version.name for version in pdk_versions]), end="")
+        if sys.stdout.isatty():
+            console = Console()
+            print_remote_list(pdk_root, pdk, console, pdk_versions)
+        else:
+            print(json.dumps([version.name for version in pdk_versions]), end="")
+    except requests.exceptions.ConnectionError:
+        if sys.stdout.isatty():
+            console = Console()
+            console.print(
+                "[red]You don't appear to be connected to the Internet. ls-remote cannot be used."
+            )
+        else:
+            print("Failed to connect to remote server", file=sys.stderr)
+        sys.exit(-1)
 
 
 @click.command("path")
