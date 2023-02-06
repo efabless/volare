@@ -2,7 +2,7 @@
   pkgs? import <nixpkgs> {}
 }:
 
-with pkgs; pkgs.python3.buildPythonPackage rec {
+with pkgs; with python3.pkgs; buildPythonPackage rec {
   name = "volare";
 
   version_file = builtins.readFile ./volare/__init__.py;
