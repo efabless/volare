@@ -10,7 +10,7 @@ with pkgs; with python3.pkgs; buildPythonPackage rec {
   version = builtins.head version_list;
 
   src = builtins.filterSource (path: type:
-    (builtins.match ''${builtins.toString ./.}/(volare(/.+)?)'' path) != null &&
+    (builtins.match ''${builtins.toString ./.}/((volare(/.+)?)|(setup.py)|(requirements(_dev)?.txt)|(Readme.md))'' path) != null &&
     (builtins.match ''.+__pycache__.*'' path == null)
   ) ./.;
 
