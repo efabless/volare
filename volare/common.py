@@ -93,11 +93,9 @@ class Version(object):
 
     @classmethod
     def from_github(Self) -> Dict[str, List["Version"]]:
-        response_str = requests.get(f"{VOLARE_REPO_API}/releases", params={
-            "per_page": 100
-        }).content.decode(
-            "utf8"
-        )
+        response_str = requests.get(
+            f"{VOLARE_REPO_API}/releases", params={"per_page": 100}
+        ).content.decode("utf8")
 
         releases = json.loads(response_str)
 
