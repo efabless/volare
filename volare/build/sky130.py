@@ -1,8 +1,20 @@
+# Copyright 2022-2023 Efabless Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import os
 import io
 import json
 import venv
-import uuid
 import shutil
 import subprocess
 from datetime import datetime
@@ -14,6 +26,7 @@ from rich.console import Console
 from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone
+from .magic import with_magic
 from ..common import (
     get_logs_dir,
     get_version_dir,
@@ -203,7 +216,7 @@ def build_sky130_timing(build_directory, sky130_path, log_dir, jobs=1):
 
         def do_submodule(submodule: str):
             submodule_cleaned = submodule.strip("/.").replace("/", "_")
-            console.log(f"Processing {submodule}…")
+            console.log(f"Generating timing files for {submodule}…")
             with open(f"{log_dir}/timing.{submodule_cleaned}.log", "w") as out:
                 subprocess.check_call(
                     [
@@ -244,112 +257,73 @@ def build_sky130_timing(build_directory, sky130_path, log_dir, jobs=1):
 
 
 def build_variants(
-    sram, build_directory, open_pdks_path, sky130_path, magic_tag, log_dir, jobs=1
+    magic_bin,
+    sram,
+    build_directory,
+    open_pdks_path,
+    sky130_path,
+    log_dir,
+    jobs=1,
 ):
     try:
+        pdk_root_abs = os.path.abspath(build_directory)
         console = Console()
 
-        magic_tag = magic_tag or MAGIC_DEFAULT_TAG
-
-        console.log(f"Using magic {magic_tag}…")
-
-        magic_image = f"efabless/openlane-tools:magic-{magic_tag}-centos-7"
-
-        subprocess.check_call(["docker", "pull", magic_image])
-
-        docker_ids = set()
-
-        def docker_run_sh(*args, log_to):
-            nonlocal docker_ids
+        def run_sh(script, log_to):
             output_file = open(log_to, "w")
-            container_id = str(uuid.uuid4())
-            docker_ids.add(container_id)
-            args = list(args)
-            pdk_root_abs = os.path.abspath(build_directory)
             try:
                 subprocess.check_call(
-                    [
-                        "docker",
-                        "run",
-                        "--name",
-                        container_id,
-                        "--rm",
-                        "-e",
-                        f"PDK_ROOT={pdk_root_abs}",
-                        "-v",
-                        f"{pdk_root_abs}:{pdk_root_abs}",
-                        "-e",
-                        f"SKY130_PATH={sky130_path}",
-                        "-v",
-                        f"{sky130_path}:{sky130_path}",
-                        "-e",
-                        f"OPEN_PDKS_PATH={open_pdks_path}",
-                        "-v",
-                        f"{open_pdks_path}:{open_pdks_path}",
-                        "-w",
-                        f"{pdk_root_abs}",
-                        magic_image,
-                        "sh",
-                        "-c",
-                    ]
-                    + args,
+                    ["sh", "-c", script],
+                    cwd=open_pdks_path,
                     stdout=output_file,
                     stderr=output_file,
+                    stdin=open(os.devnull),
                 )
             except subprocess.CalledProcessError as e:
                 console.log(
                     f"An error occurred while building the PDK. Check {log_to} for more information."
                 )
-                docker_ids.remove(container_id)
                 raise e
-            docker_ids.remove(container_id)
 
         sram_opt = "--enable-sram-sky130" if sram else ""
+        magic_dirname = os.path.dirname(magic_bin)
 
-        interrupted = None
-        try:
-            console.log("Configuring open_pdks…")
-            docker_run_sh(
+        with console.status("Configuring open_pdks…"):
+            run_sh(
                 f"""
                     set -e
-                    cd $OPEN_PDKS_PATH
-                    ./configure --enable-sky130-pdk=$SKY130_PATH/libraries {sram_opt}
+                    export PATH="{magic_dirname}:$PATH"
+                    ./configure --enable-sky130-pdk={sky130_path}/libraries {sram_opt}
                 """,
                 log_to=os.path.join(log_dir, "config.log"),
             )
-            console.log("Done.")
+        console.log("Configured open_pdks.")
 
-            console.log("Building variants using open_pdks…")
-            docker_run_sh(
+        with console.status("Building variants using open_pdks…"):
+            run_sh(
                 f"""
                     set -e
-                    cd $OPEN_PDKS_PATH
                     export LC_ALL=en_US.UTF-8
+                    export PATH="{magic_dirname}:$PATH"
                     make -j{jobs}
-                    make SHARED_PDKS_PATH=$PDK_ROOT install
+                    make 'SHARED_PDKS_PATH={pdk_root_abs}' install
                 """,
                 log_to=os.path.join(log_dir, "install.log"),
             )
-        except KeyboardInterrupt as e:
-            interrupted = e
-            console.log("Stopping on keyboard interrupt…")
-            console.log("Killing docker containers…")
-            for id in docker_ids:
-                subprocess.call(["docker", "kill", id])
+        console.log("Built PDK variants.")
 
-        console.log("Fixing file ownership…")
-        docker_run_sh(
-            """
+        with console.status("Fixing file ownership…"):
+            run_sh(
+                f"""
                 set -e
-                OWNERSHIP="$(stat -c "%u:%g" $PDK_ROOT)"
-                chown -R $OWNERSHIP $PDK_ROOT
-            """,
-            log_to=os.path.join(log_dir, "ownership.log"),
-        )
-        if interrupted is not None:
-            raise interrupted
-        else:
-            console.log("Done.")
+                OWNERSHIP="$(stat -c "%u:%g" "{pdk_root_abs}")"
+                chown -R $OWNERSHIP "{pdk_root_abs}"
+                """,
+                log_to=os.path.join(log_dir, "ownership.log"),
+            )
+        console.log("Fixed file ownership.")
+
+        console.log("Done.")
 
     except subprocess.CalledProcessError as e:
         print(e)
@@ -396,6 +370,7 @@ def build(
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     using_repos: Optional[Dict[str, str]] = None,
+    build_magic: bool = False,
 ):
     if include_libraries is None or len(include_libraries) == 0:
         include_libraries = [
@@ -423,8 +398,19 @@ def build(
         include_libraries, build_directory, sky130_tag, jobs, using_repos.get("sky130")
     )
     build_sky130_timing(build_directory, sky130_path, log_dir, jobs)
-    build_variants(
-        sram, build_directory, open_pdks_path, sky130_path, magic_tag, log_dir, jobs
+
+    with_magic(
+        magic_tag,
+        lambda magic_bin: build_variants(
+            magic_bin,
+            sram,
+            build_directory,
+            open_pdks_path,
+            sky130_path,
+            log_dir,
+            jobs,
+        ),
+        build_magic=build_magic,
     )
     install_sky130(build_directory, pdk_root, version)
 

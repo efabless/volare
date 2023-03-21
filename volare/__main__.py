@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# Copyright 2022 Efabless Corporation
+# Copyright 2022-2023 Efabless Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +18,7 @@ from . import __version__
 from .build import build_cmd, push_cmd
 from .manage import (
     output_cmd,
+    prune_cmd,
     path_cmd,
     list_cmd,
     list_remote_cmd,
@@ -34,6 +34,7 @@ def cli():
 
 
 cli.add_command(output_cmd)
+cli.add_command(prune_cmd)
 cli.add_command(build_cmd)
 cli.add_command(push_cmd)
 cli.add_command(path_cmd)

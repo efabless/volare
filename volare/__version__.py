@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from .common import get_volare_home, get_current_version, get_installed_list, Version
-from .manage import enable
-from .build import build
+__version__ = "0.7.0"
 
-from .__version__ import __version__
+if __name__ == "__main__":
+    print(__version__, end="")

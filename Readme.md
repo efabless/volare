@@ -127,7 +127,11 @@ What's more is: if you're using a repository with a `tool_metadata.yml` file, su
 ## Building PDKs
 For special cases, i.e. you require other libraries, you'll have to build the PDK yourself, which Volare does support.
 
-It does require Docker 19.04 or higher, however.
+You'll either need Magic installed or you'll need to pass the flag `--build-magic` to build Magic ad-hoc for the PDK build, the latter option of which is only supported on Linux and requires all of Magic's dependencies to be installed. On Ubuntu, that's:
+
+```sh
+sudo apt-get install -y python3 tcsh tcl-dev tk-dev libcairo2-dev m4
+```
 
 You can invoke `volare build --help` for more options. Be aware, the built PDK won't automatically be enabled and you'll have to `volare enable` the appropriate version.
 

@@ -1,3 +1,16 @@
+# Copyright 2022-2023 Efabless Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import os
 import shutil
 import subprocess
@@ -131,6 +144,7 @@ def build(
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     using_repos: Optional[Dict[str, str]] = None,
+    build_magic: bool = False,
 ):
     if using_repos is None:
         using_repos = {}
