@@ -1,7 +1,7 @@
 wheel
 black~=22.3.0
 flake8~=4.0.1
-mypy>=0.971,<1
+mypy
 types-requests
 types-PyYAML
 types-setuptools

@@ -1,7 +1,6 @@
 import os
 import io
 import json
-import uuid
 import shutil
 import subprocess
 from datetime import datetime
@@ -12,6 +11,7 @@ import pcpp
 from rich.console import Console
 from rich.progress import Progress
 
+from .magic import with_magic
 from .git_multi_clone import GitMultiClone
 from ..common import (
     get_logs_dir,
@@ -113,109 +113,68 @@ LIB_FLAG_MAP = {
 
 
 def build_variants(
-    include_libraries, build_directory, open_pdks_path, magic_tag, log_dir, jobs=1
+    magic_bin, include_libraries, build_directory, open_pdks_path, log_dir, jobs=1
 ):
 
     try:
+        pdk_root_abs = os.path.abspath(build_directory)
         console = Console()
 
-        magic_tag = magic_tag or MAGIC_DEFAULT_TAG
-
-        console.log(f"Using magic {magic_tag}…")
-
-        magic_image = f"efabless/openlane-tools:magic-{magic_tag}-centos-7"
-
-        subprocess.check_call(["docker", "pull", magic_image])
-
-        docker_ids = set()
-
-        def docker_run_sh(*args, log_to):
-            nonlocal docker_ids
+        def run_sh(script, log_to):
             output_file = open(log_to, "w")
-            container_id = str(uuid.uuid4())
-            docker_ids.add(container_id)
-            args = list(args)
-            pdk_root_abs = os.path.abspath(build_directory)
             try:
                 subprocess.check_call(
-                    [
-                        "docker",
-                        "run",
-                        "--name",
-                        container_id,
-                        "--rm",
-                        "-e",
-                        f"PDK_ROOT={pdk_root_abs}",
-                        "-v",
-                        f"{pdk_root_abs}:{pdk_root_abs}",
-                        "-e",
-                        f"OPEN_PDKS_PATH={open_pdks_path}",
-                        "-v",
-                        f"{open_pdks_path}:{open_pdks_path}",
-                        "-w",
-                        f"{pdk_root_abs}",
-                        magic_image,
-                        "sh",
-                        "-c",
-                    ]
-                    + args,
+                    ["sh", "-c", script],
+                    cwd=open_pdks_path,
                     stdout=output_file,
                     stderr=output_file,
+                    stdin=open(os.devnull),
                 )
             except subprocess.CalledProcessError as e:
                 console.log(
                     f"An error occurred while building the PDK. Check {log_to} for more information."
                 )
-                docker_ids.remove(container_id)
                 raise e
-            docker_ids.remove(container_id)
 
         library_flags = [LIB_FLAG_MAP[library] for library in include_libraries]
+        magic_dirname = os.path.dirname(magic_bin)
 
-        interrupted = None
-        try:
-            console.log("Configuring open_pdks…")
-            docker_run_sh(
+        with console.status("Configuring open_pdks…"):
+            run_sh(
                 f"""
-                    set +e
-                    cd $OPEN_PDKS_PATH
+                    set -e
+                    export PATH="{magic_dirname}:$PATH"
                     ./configure --enable-gf180mcu-pdk {' '.join(library_flags)}
                 """,
                 log_to=os.path.join(log_dir, "config.log"),
             )
-            console.log("Done.")
+        console.log("Configured open_pdks.")
 
-            console.log("Building variants using open_pdks…")
-            docker_run_sh(
+        with console.status("Building variants using open_pdks…"):
+            run_sh(
                 f"""
-                    set +e
-                    cd $OPEN_PDKS_PATH
+                    set -e
                     export LC_ALL=en_US.UTF-8
+                    export PATH="{magic_dirname}:$PATH"
                     make -j{jobs}
-                    make SHARED_PDKS_PATH=$PDK_ROOT install
+                    make 'SHARED_PDKS_PATH={pdk_root_abs}' install
                 """,
                 log_to=os.path.join(log_dir, "install.log"),
             )
-        except KeyboardInterrupt as e:
-            interrupted = e
-            console.log("Stopping on keyboard interrupt…")
-            console.log("Killing docker containers…")
-            for id in docker_ids:
-                subprocess.call(["docker", "kill", id])
+        console.log("Built PDK variants.")
 
-        console.log("Fixing file ownership…")
-        docker_run_sh(
-            """
-                set +e
-                OWNERSHIP="$(stat -c "%u:%g" $PDK_ROOT)"
-                chown -R $OWNERSHIP $PDK_ROOT
-            """,
-            log_to=os.path.join(log_dir, "ownership.log"),
-        )
-        if interrupted is not None:
-            raise interrupted
-        else:
-            console.log("Done.")
+        with console.status("Fixing file ownership…"):
+            run_sh(
+                f"""
+                set -e
+                OWNERSHIP="$(stat -c "%u:%g" "{pdk_root_abs}")"
+                chown -R $OWNERSHIP "{pdk_root_abs}"
+                """,
+                log_to=os.path.join(log_dir, "ownership.log"),
+            )
+        console.log("Fixed file ownership.")
+
+        console.log("Done.")
 
     except subprocess.CalledProcessError as e:
         print(e)
@@ -262,6 +221,7 @@ def build(
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     using_repos: Optional[Dict[str, str]] = None,
+    build_magic: bool = False,
 ):
     if include_libraries is None or len(include_libraries) == 0:
         include_libraries = [
@@ -290,13 +250,17 @@ def build(
     open_pdks_path, _, magic_tag = get_open_pdks(
         version, build_directory, jobs, using_repos.get("open_pdks")
     )
-    build_variants(
-        include_libraries,
-        build_directory,
-        open_pdks_path,
+    with_magic(
         magic_tag,
-        log_dir,
-        jobs,
+        lambda magic_bin: build_variants(
+            magic_bin,
+            include_libraries,
+            build_directory,
+            open_pdks_path,
+            log_dir,
+            jobs,
+        ),
+        build_magic=build_magic,
     )
     install_gf180mcu(build_directory, pdk_root, version)
 

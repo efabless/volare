@@ -182,6 +182,11 @@ def opt_build(function: Callable):
         type=str,
         help="Use this repository instead of cloning and checking out, in the format repo_name=/path/to/repo. You can pass it multiple times to replace multiple repos. This feature is intended for volare and PDK developers.",
     )(function)
+    function = opt(
+        "--build-magic/--use-system-magic",
+        default=False,
+        help="Whether to attempt to build Magic from source or use Magic from PATH for PDKs that may need Magic.",
+    )(function)
     return function
 
 

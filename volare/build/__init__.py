@@ -35,6 +35,7 @@ def build(
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     use_repo_at: Optional[List[str]] = None,
+    build_magic: bool = False,
 ):
     use_repos = {}
     if use_repo_at is not None:
@@ -53,6 +54,7 @@ def build(
         "clear_build_artifacts": clear_build_artifacts,
         "include_libraries": include_libraries,
         "using_repos": use_repos,
+        "build_magic": build_magic,
     }
 
     build_module = importlib.import_module(f".{pdk}", package=__name__)
@@ -81,6 +83,7 @@ def build_cmd(
     tool_metadata_file_path,
     version,
     use_repo_at,
+    build_magic,
 ):
     """
     Builds the requested PDK.
@@ -102,6 +105,7 @@ def build_cmd(
         clear_build_artifacts=clear_build_artifacts,
         include_libraries=include_libraries,
         use_repo_at=use_repo_at,
+        build_magic=build_magic,
     )
 
 

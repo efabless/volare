@@ -241,7 +241,7 @@ def enable(
         if status == 404:
             console.print(f"Version {version} not found either locally or remotely.")
             if build_if_not_found:
-                console.print("Attempting to build...")
+                console.print("Attempting to build…")
                 build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
                 if also_push:
                     push(pdk_root=pdk_root, pdk=pdk, version=version, **push_kwargs)
@@ -254,6 +254,7 @@ def enable(
             with tempfile.TemporaryDirectory(suffix=".volare") as tarball_directory:
                 tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
                 with requests.get(link, stream=True) as r:
+                    assert isinstance(r, requests.Response)
                     with rich.progress.Progress() as p:
                         task = p.add_task(
                             f"Downloading pre-built tarball for {version}…",
@@ -270,6 +271,8 @@ def enable(
                             p.update(task, total=len(tf.getmembers()))
                             for i, file in enumerate(tf.getmembers()):
                                 p.update(task, completed=i + 1)
+                                if file.isdir():
+                                    continue
                                 final_path = os.path.join(version_directory, file.name)
                                 final_dir = os.path.dirname(final_path)
                                 mkdirp(final_dir)
@@ -367,6 +370,7 @@ def enable_or_build_cmd(
     also_push,
     version,
     use_repo_at,
+    build_magic,
 ):
     """
     Attempts to activate a given PDK version. If the version is not found locally or remotely,
@@ -388,6 +392,7 @@ def enable_or_build_cmd(
             "sram": sram,
             "clear_build_artifacts": clear_build_artifacts,
             "use_repo_at": use_repo_at,
+            "build_magic": build_magic,
         },
         push_kwargs={
             "owner": owner,

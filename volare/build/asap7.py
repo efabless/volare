@@ -131,6 +131,7 @@ def build(
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     using_repos: Optional[Dict[str, str]] = None,
+    build_magic: bool = False,
 ):
     if using_repos is None:
         using_repos = {}
