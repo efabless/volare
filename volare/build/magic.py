@@ -33,7 +33,8 @@ def with_magic(
     build_magic: bool = False,
 ) -> T:
     if not build_magic:
-        if magic_bin := shutil.which("magic"):
+        magic_bin = shutil.which("magic")
+        if magic_bin is not None:
             return callable(magic_bin)
         else:
             raise ValueError("Magic not found in PATH.")
