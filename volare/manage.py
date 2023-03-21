@@ -57,7 +57,7 @@ def print_installed_list(
     versions = installed_list
 
     try:
-        all_remote_versions = Version.from_github()
+        all_remote_versions = Version._from_github()
         remote_versions = all_remote_versions.get(pdk) or []
         remote_version_dict = {rv.name: rv for rv in remote_versions}
         for installed in installed_list:
@@ -186,7 +186,7 @@ def list_remote_cmd(pdk_root, pdk):
     """Lists PDK versions that are remotely available. JSON if not outputting to a tty."""
 
     try:
-        all_versions = Version.from_github()
+        all_versions = Version._from_github()
         pdk_versions = all_versions.get(pdk) or []
 
         if sys.stdout.isatty():
