@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# Copyright 2022 Efabless Corporation
+# Copyright 2022-2023 Efabless Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +14,8 @@
 import os
 import sys
 import json
+import shutil
 import tarfile
-import pathlib
 import requests
 import tempfile
 from typing import List, Optional
@@ -31,23 +30,21 @@ from .build.git_multi_clone import mkdirp
 from .common import (
     Version,
     get_link_of,
-    opt,
-    opt_build,
-    opt_push,
-    opt_pdk_root,
     check_version,
     get_versions_dir,
     get_version_dir,
     get_volare_dir,
+    get_current_version,
+    get_installed_list,
+)
+from .click_common import (
+    opt,
+    opt_build,
+    opt_push,
+    opt_pdk_root,
 )
 from .build import build, push
 from .families import Family
-
-
-def get_installed_list(pdk_root: str, pdk: str) -> List[Version]:
-    versions_dir = get_versions_dir(pdk_root, pdk)
-    mkdirp(versions_dir)
-    return [Version(version, pdk, None, None) for version in os.listdir(versions_dir)]
 
 
 def print_installed_list(
@@ -74,19 +71,16 @@ def print_installed_list(
             "[red]You don't appear to be connected to the Internet. Date information may be unavailable."
         )
 
-    version = get_current_version(pdk_root, pdk)
-
     versions_dir = get_versions_dir(pdk_root, pdk)
     tree = rich.tree.Tree(f"{versions_dir}")
     for installed in versions:
-        name = installed.name
         day: Optional[str] = None
         if installed.commit_date is not None:
             day = installed.commit_date.strftime("%Y.%m.%d")
         desc = f"{installed.name}"
         if day is not None:
-            desc += " ({day})"
-        if name == version:
+            desc += f" ({day})"
+        if installed.is_current(pdk_root):
             tree.add(f"[green][bold]{desc} (enabled)")
         else:
             tree.add(desc)
@@ -119,15 +113,7 @@ def print_remote_list(
     console.print(tree)
 
 
-def get_current_version(pdk_root: str, pdk: str) -> str:
-    current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
-    current_file_dir = os.path.dirname(current_file)
-    mkdirp(current_file_dir)
-    pathlib.Path(current_file).touch(exist_ok=True)
-
-    return open(current_file).read().strip()
-
-
+# -- CLI
 @click.command("output")
 @opt_pdk_root
 def output_cmd(pdk_root, pdk):
@@ -156,6 +142,28 @@ def output_cmd(pdk_root, pdk):
             exit(1)
         else:
             print(version, end="")
+
+
+@click.command("prune")
+@opt_pdk_root
+@click.option(
+    "--yes",
+    is_flag=True,
+    callback=lambda c, _, v: not v and c.abort(),
+    expose_value=False,
+    prompt="Are you sure? This will delete all non-current versions of the PDK from your computer.",
+)
+def prune_cmd(pdk_root, pdk):
+    """Removes all PDKs other than, if it exists, the one currently in use."""
+    pdk_versions = get_installed_list(pdk_root, pdk)
+    for version in pdk_versions:
+        if version.is_current(pdk_root):
+            continue
+        try:
+            shutil.rmtree(version.path)
+            print(f"Deleted {version}.")
+        except Exception as e:
+            print(f"Failed to delete {version}: {e}", file=sys.stderr)
 
 
 @click.command("ls")

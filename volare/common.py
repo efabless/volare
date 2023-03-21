@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# Copyright 2022 Efabless Corporation
+# Copyright 2022-2023 Efabless Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,10 +16,9 @@ import re
 import json
 import pathlib
 from datetime import datetime
-from functools import partial
-from typing import Optional, Callable, List, Dict
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Union
 
-import click
 import requests
 from rich.console import Console
 
@@ -67,29 +65,23 @@ class RepoMetadata(object):
         self.default_branch = default_branch
 
 
+@dataclass
 class Version(object):
-    def __init__(
-        self,
-        name: str,
-        pdk: str,
-        commit_date: Optional[datetime],
-        upload_date: Optional[datetime],
-        prerelease: bool = False,
-    ):
-        self.name = name
-        self.pdk = pdk
-
-        # The date the open_pdks commit was created
-        self.commit_date = commit_date
-
-        # The day this version was compiled and uploaded to volare
-        self.upload_date = upload_date
-
-        # Is this a pre-release?
-        self.prerelease = prerelease
+    name: str
+    pdk: str
+    commit_date: Optional[datetime] = None
+    upload_date: Optional[datetime] = None
+    prerelease: bool = False
+    path: Optional[str] = None
 
     def __lt__(self, rhs: "Version"):
         return (self.commit_date or datetime.min) < (rhs.commit_date or datetime.min)
+
+    def is_current(self, pdk_root: str) -> bool:
+        return self.name == get_current_version(pdk_root, self.pdk)
+
+    def __str__(self) -> str:
+        return self.name
 
     @classmethod
     def from_github(Self) -> Dict[str, List["Version"]]:
@@ -116,7 +108,11 @@ class Version(object):
                 commit_date = date_from_iso8601(commit_date_match[1])
 
             remote_version = Self(
-                hash, family, commit_date, upload_date, release["prerelease"]
+                name=hash,
+                pdk=family,
+                commit_date=commit_date,
+                upload_date=upload_date,
+                prerelease=release["prerelease"],
             )
 
             if rvs_by_pdk.get(family) is None:
@@ -128,85 +124,6 @@ class Version(object):
             rvs_by_pdk[family].sort(reverse=True)
 
         return rvs_by_pdk
-
-
-opt = partial(click.option, show_default=True)
-
-
-def opt_pdk_root(function: Callable):
-    function = click.option(
-        "--pdk",
-        required=False,
-        default=os.getenv("PDK_FAMILY") or "sky130",
-        help="The PDK family to install",
-        show_default=True,
-    )(function)
-    function = click.option(
-        "--pdk-root",
-        required=False,
-        default=VOLARE_RESOLVED_HOME,
-        help="Path to the PDK root",
-        show_default=True,
-    )(function)
-    return function
-
-
-def opt_build(function: Callable):
-    function = opt(
-        "-l",
-        "--include-libraries",
-        multiple=True,
-        default=None,
-        help="Libraries to include in the build. You can use -l multiple times to include multiple libraries. Pass 'all' to include all of them. A default of 'None' uses a default set for the particular PDK.",
-    )(function)
-    function = opt(
-        "-j",
-        "--jobs",
-        default=1,
-        help="Specifies the number of commands to run simultaneously.",
-    )(function)
-    function = opt("--sram/--no-sram", default=True, help="Enable or disable sram")(
-        function
-    )
-    function = opt(
-        "--clear-build-artifacts/--keep-build-artifacts",
-        default=False,
-        help="Whether or not to remove the build artifacts. Keeping the build artifacts is useful when testing.",
-    )(function)
-    function = opt(
-        "-r",
-        "--use-repo-at",
-        default=None,
-        multiple=True,
-        hidden=True,
-        type=str,
-        help="Use this repository instead of cloning and checking out, in the format repo_name=/path/to/repo. You can pass it multiple times to replace multiple repos. This feature is intended for volare and PDK developers.",
-    )(function)
-    function = opt(
-        "--build-magic/--use-system-magic",
-        default=False,
-        help="Whether to attempt to build Magic from source or use Magic from PATH for PDKs that may need Magic.",
-    )(function)
-    return function
-
-
-def opt_push(function: Callable):
-    function = opt("-o", "--owner", default=VOLARE_REPO_OWNER, help="Repository Owner")(
-        function
-    )
-    function = opt("-r", "--repository", default=VOLARE_REPO_NAME, help="Repository")(
-        function
-    )
-    function = opt(
-        "-t",
-        "--token",
-        default=os.getenv("GITHUB_TOKEN"),
-        help="Github Token",
-    )(function)
-    function = opt(
-        "--pre/--prod", default=False, help="Push as pre-release or production"
-    )(function)
-    return function
 
 
 def check_version(
@@ -279,8 +196,8 @@ def get_versions_dir(pdk_root: str, pdk: str) -> str:
     return os.path.join(get_volare_dir(pdk_root, pdk), "versions")
 
 
-def get_version_dir(pdk_root: str, pdk: str, version: str) -> str:
-    return os.path.join(get_versions_dir(pdk_root, pdk), version)
+def get_version_dir(pdk_root: str, pdk: str, version: Union[str, Version]) -> str:
+    return os.path.join(get_versions_dir(pdk_root, pdk), str(version))
 
 
 def get_link_of(version: str, pdk: str) -> str:
@@ -308,3 +225,25 @@ def get_date_of(opdks_commit: str) -> Optional[datetime]:
     date = response["commit"]["author"]["date"]
     commit_date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
     return commit_date
+
+
+def get_installed_list(pdk_root: str, pdk: str) -> List[Version]:
+    versions_dir = get_versions_dir(pdk_root, pdk)
+    mkdirp(versions_dir)
+    return [
+        Version(
+            name=version,
+            pdk=pdk,
+            path=os.path.join(versions_dir, version),
+        )
+        for version in os.listdir(versions_dir)
+    ]
+
+
+def get_current_version(pdk_root: str, pdk: str) -> str:
+    current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
+    current_file_dir = os.path.dirname(current_file)
+    mkdirp(current_file_dir)
+    pathlib.Path(current_file).touch(exist_ok=True)
+
+    return open(current_file).read().strip()

@@ -9,8 +9,7 @@ Thumbs.db
 # Python
 __pycache__
 .mypy_cache/
-build/
-!volare/build
+/build
 /venv
 *.egg-info/
 dist/
@@ -18,3 +17,4 @@ dist/
 # Artifacts
 logs/
 pdks/
+/result
