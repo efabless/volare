@@ -157,7 +157,7 @@ def build_variants(
                 f"""
                     set -e
                     export PATH="{magic_dirname}:$PATH"
-                    ./configure --enable-gf180mcu-pdk {' '.join(library_flags)}
+                    ./configure --enable-gf180mcu-pdk {' '.join(library_flags)} --with-reference
                 """,
                 log_to=os.path.join(log_dir, "config.log"),
             )

@@ -293,7 +293,7 @@ def build_variants(
                 f"""
                     set -e
                     export PATH="{magic_dirname}:$PATH"
-                    ./configure --enable-sky130-pdk={sky130_path}/libraries {sram_opt}
+                    ./configure --enable-sky130-pdk={sky130_path}/libraries {sram_opt} --with-reference
                 """,
                 log_to=os.path.join(log_dir, "config.log"),
             )
