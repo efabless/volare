@@ -244,6 +244,10 @@ def get_current_version(pdk_root: str, pdk: str) -> str:
     current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
-    pathlib.Path(current_file).touch(exist_ok=True)
+    version = ""
+    try:
+        version = open(current_file).read().strip()
+    except FileNotFoundError:
+        pass
 
-    return open(current_file).read().strip()
+    return version
