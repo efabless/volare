@@ -19,6 +19,7 @@ from .build import build_cmd, push_cmd
 from .manage import (
     output_cmd,
     prune_cmd,
+    rm_cmd,
     path_cmd,
     list_cmd,
     list_remote_cmd,
@@ -35,6 +36,7 @@ def cli():
 
 cli.add_command(output_cmd)
 cli.add_command(prune_cmd)
+cli.add_command(rm_cmd)
 cli.add_command(build_cmd)
 cli.add_command(push_cmd)
 cli.add_command(path_cmd)
@@ -44,7 +46,6 @@ cli.add_command(enable_cmd)
 cli.add_command(enable_or_build_cmd)
 
 try:
-    import lzma  # noqa: F401
     import ssl  # noqa: F401
 except ModuleNotFoundError as e:
     print(

@@ -46,7 +46,7 @@ def opt_build(function: Callable):
         "--include-libraries",
         multiple=True,
         default=None,
-        help="Libraries to include in the build. You can use -l multiple times to include multiple libraries. Pass 'all' to include all of them. A default of 'None' uses a default set for the particular PDK.",
+        help="Libraries to include. You can use -l multiple times to include multiple libraries. Pass 'all' to include all of them. A default of 'None' uses a default set for the particular PDK.",
     )(function)
     function = opt(
         "-j",
@@ -54,9 +54,12 @@ def opt_build(function: Callable):
         default=1,
         help="Specifies the number of commands to run simultaneously.",
     )(function)
-    function = opt("--sram/--no-sram", default=True, help="Enable or disable sram")(
-        function
-    )
+    function = opt(
+        "--sram/--no-sram",
+        default=True,
+        hidden=True,
+        expose_value=False,
+    )(function)
     function = opt(
         "--clear-build-artifacts/--keep-build-artifacts",
         default=False,

@@ -121,7 +121,9 @@ LIB_FLAG_MAP = {
     "gf180mcu_fd_sc_mcu7t5v0": "--enable-sc-7t5v0-gf180mcu",
     "gf180mcu_fd_sc_mcu9t5v0": "--enable-sc-9t5v0-gf180mcu",
     "gf180mcu_fd_io": "--enable-io-gf180mcu",
-    "gf180mcu_fd_bd_sram": "--enable-sram-gf180mcu",
+    "gf180mcu_fd_ip_sram": "--enable-sram-gf180mcu",
+    "gf180mcu_osu_sc_gp12t3v3": "--enable-osu-sc-gf180mcu",
+    "gf180mcu_osu_sc_gp9t3v3": "--enable-osu-sc-gf180mcu",
 }
 
 
@@ -149,7 +151,7 @@ def build_variants(
                 )
                 raise e
 
-        library_flags = [LIB_FLAG_MAP[library] for library in include_libraries]
+        library_flags = set([LIB_FLAG_MAP[library] for library in include_libraries])
         magic_dirname = os.path.dirname(magic_bin)
 
         with console.status("Configuring open_pdks…"):
@@ -230,22 +232,15 @@ def build(
     pdk_root: str,
     version: str,
     jobs: int = 1,
-    sram: bool = True,
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     using_repos: Optional[Dict[str, str]] = None,
     build_magic: bool = False,
 ):
-    if include_libraries is None or len(include_libraries) == 0:
-        include_libraries = [
-            "gf180mcu_fd_sc_mcu7t5v0",
-            "gf180mcu_fd_sc_mcu9t5v0",
-            "gf180mcu_fd_io",
-            "gf180mcu_fd_pr",
-        ]
-
-    if sram:
-        include_libraries.append("gf180mcu_fd_bd_sram")
+    if include_libraries is None:
+        include_libraries = Family.by_name["gf180mcu"].default_includes.copy()
+    if "all" in include_libraries:
+        include_libraries = list(LIB_FLAG_MAP.keys())
 
     if using_repos is None:
         using_repos = {}
@@ -267,7 +262,7 @@ def build(
         magic_tag,
         lambda magic_bin: build_variants(
             magic_bin,
-            include_libraries,
+            list(include_libraries),
             build_directory,
             open_pdks_path,
             log_dir,

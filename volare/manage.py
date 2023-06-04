@@ -18,23 +18,22 @@ import shutil
 import tarfile
 import requests
 import tempfile
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import rich
 import click
 import rich.tree
 import rich.progress
+import zstandard as zstd
 from rich.console import Console
 
 from .build.git_multi_clone import mkdirp
 from .common import (
     Version,
-    get_link_of,
     check_version,
+    get_release_links,
     get_versions_dir,
-    get_version_dir,
     get_volare_dir,
-    get_current_version,
     get_installed_list,
 )
 from .click_common import (
@@ -92,8 +91,6 @@ def print_remote_list(
 ):
     installed_list = get_installed_list(pdk_root, pdk)
 
-    version = get_current_version(pdk_root, pdk)
-
     tree = rich.tree.Tree(f"Pre-built {pdk} PDK versions")
     for remote_version in pdk_list:
         name = remote_version.name
@@ -104,7 +101,7 @@ def print_remote_list(
         desc = f"[green]{name} ({day})"
         if remote_version.prerelease:
             desc = f"[red]PRE-RELEASE {desc}"
-        if name == version:
+        if remote_version.is_current(pdk_root):
             tree.add(f"[bold]{desc} (enabled)")
         elif name in installed_list:
             tree.add(f"{desc} (installed)")
@@ -124,24 +121,24 @@ def output_cmd(pdk_root, pdk):
     exit code of 1.
     """
 
-    version = get_current_version(pdk_root, pdk)
+    version = Version.get_current(pdk_root, pdk)
     if sys.stdout.isatty():
-        if version == "":
+        if version is None:
             print(f"No version of the PDK {pdk} is currently enabled at {pdk_root}.")
             print(
                 "Invoke volare --help for assistance installing and enabling versions."
             )
             exit(1)
         else:
-            print(f"Installed: {pdk} v{version}")
+            print(f"Installed: {pdk} v{version.name}")
             print(
                 "Invoke volare --help for assistance installing and enabling versions."
             )
     else:
-        if version == "":
+        if version is None:
             exit(1)
         else:
-            print(version, end="")
+            print(version.name, end="")
 
 
 @click.command("prune")
@@ -151,7 +148,7 @@ def output_cmd(pdk_root, pdk):
     is_flag=True,
     callback=lambda c, _, v: not v and c.abort(),
     expose_value=False,
-    prompt="Are you sure? This will delete all non-current versions of the PDK from your computer.",
+    prompt="Are you sure? This will delete all non-enabled versions of the PDK from your computer.",
 )
 def prune_cmd(pdk_root, pdk):
     """Removes all PDKs other than, if it exists, the one currently in use."""
@@ -160,10 +157,31 @@ def prune_cmd(pdk_root, pdk):
         if version.is_current(pdk_root):
             continue
         try:
-            shutil.rmtree(version.path)
+            version.uninstall()
             print(f"Deleted {version}.")
         except Exception as e:
             print(f"Failed to delete {version}: {e}", file=sys.stderr)
+
+
+@click.command("rm")
+@opt_pdk_root
+@click.option(
+    "--yes",
+    is_flag=True,
+    callback=lambda c, _, v: not v and c.abort(),
+    expose_value=False,
+    prompt="Are you sure? This will delete this version of the PDK from your computer.",
+)
+@click.argument("version", required=False)
+def rm_cmd(pdk_root, pdk, version):
+    """Removes the PDK version specified."""
+    version_object = Version(version, pdk)
+    try:
+        version_object.uninstall(pdk_root)
+        print(f"Deleted {version}.")
+    except Exception as e:
+        print(f"Failed to delete: {e}", file=sys.stderr)
+        exit(1)
 
 
 @click.command("ls")
@@ -210,10 +228,8 @@ def list_remote_cmd(pdk_root, pdk):
 @click.argument("version", required=False)
 def path_cmd(pdk_root, pdk, version):
     """Prints the path of a specific pdk version installation."""
-    path_to_print = pdk_root
-    if version is not None:
-        path_to_print = os.path.join(get_versions_dir(pdk_root, pdk), version)
-    print(path_to_print, end="")
+    version = Version(version, pdk)
+    print(version.get_dir(pdk_root), end="")
 
 
 def enable(
@@ -224,6 +240,7 @@ def enable(
     also_push=False,
     build_kwargs: dict = {},
     push_kwargs: dict = {},
+    include_libraries: Optional[List[str]] = None,
 ):
     console = Console()
 
@@ -231,7 +248,9 @@ def enable(
     current_file_dir = os.path.dirname(current_file)
     mkdirp(current_file_dir)
 
-    version_directory = get_version_dir(pdk_root, pdk, version)
+    version_object = Version(version, pdk)
+
+    version_directory = version_object.get_dir(pdk_root)
 
     pdk_family = Family.by_name.get(pdk)
     if pdk_family is None:
@@ -244,12 +263,11 @@ def enable(
     final_paths = [os.path.join(pdk_root, variant) for variant in variants]
 
     if not os.path.exists(version_directory):
-        link = get_link_of(version, pdk)
-        status = requests.head(link).status_code
-        if status == 404:
-            console.print(f"Version {version} not found either locally or remotely.")
+        release_link_list = get_release_links(version, pdk, include_libraries)
+
+        if release_link_list is None:
             if build_if_not_found:
-                console.print("Attempting to build…")
+                console.print(f"Version {version} not found, attempting to build…")
                 build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
                 if also_push:
                     push(pdk_root=pdk_root, pdk=pdk, version=version, **push_kwargs)
@@ -259,13 +277,14 @@ def enable(
                 )
                 exit(1)
         else:
-            with tempfile.TemporaryDirectory(suffix=".volare") as tarball_directory:
-                tarball_path = os.path.join(tarball_directory, f"{version}.tar.xz")
-                with requests.get(link, stream=True) as r:
-                    assert isinstance(r, requests.Response)
-                    with rich.progress.Progress() as p:
+            try:
+                tarball_directory = tempfile.TemporaryDirectory(suffix=".volare")
+                for name, link in release_link_list:
+                    tarball_path = os.path.join(tarball_directory.name, name)
+                    r = requests.get(link, stream=True)
+                    with rich.progress.Progress(console=console) as p:
                         task = p.add_task(
-                            f"Downloading pre-built tarball for {version}…",
+                            f"Downloading {name}…",
                             total=int(r.headers["Content-length"]),
                         )
                         r.raise_for_status()
@@ -274,11 +293,21 @@ def enable(
                                 p.advance(task, advance=len(chunk))
                                 f.write(chunk)
 
-                        task = p.add_task("Unpacking…")
-                        with tarfile.open(tarball_path, mode="r:*") as tf:
-                            p.update(task, total=len(tf.getmembers()))
-                            for i, file in enumerate(tf.getmembers()):
-                                p.update(task, completed=i + 1)
+                    with console.status(f"Unpacking {name}…"):
+                        stream: Any = None
+                        if name.endswith(".tar.zst"):
+                            stream = zstd.open(tarball_path, mode="rb")
+                        else:
+                            try:
+                                import lzma
+
+                                stream = lzma.open(tarball_path, mode="rb")
+                            except ImportError:
+                                raise OSError(
+                                    "Your Python installation does not support xz compression. Either reinstall Python or try a newer PDK version."
+                                )
+                        with tarfile.TarFile(fileobj=stream, mode="r") as tf:
+                            for file in tf:
                                 if file.isdir():
                                     continue
                                 final_path = os.path.join(version_directory, file.name)
@@ -286,23 +315,28 @@ def enable(
                                 mkdirp(final_dir)
                                 io = tf.extractfile(file)
                                 if io is None:
-                                    console.print("[red]Failed to unpack tarball.")
-                                    exit(1)
+                                    raise ValueError(
+                                        f"Failed to unpack tarball for {name}."
+                                    )
                                 with open(final_path, "wb") as f:
                                     f.write(io.read())
+            except Exception as e:
+                shutil.rmtree(version_directory, ignore_errors=True)
+                console.print(f"[red]Error: {e}")
+                exit(-1)
+            except KeyboardInterrupt:
+                console.print("Interrupted.")
+                shutil.rmtree(version_directory, ignore_errors=True)
+                exit(-1)
 
-                        for variant in variants:
-                            variant_install_path = os.path.join(
-                                version_directory, variant
-                            )
-                            variant_sources_file = os.path.join(
-                                variant_install_path, "SOURCES"
-                            )
-                            if not os.path.isfile(variant_sources_file):
-                                with open(variant_sources_file, "w") as f:
-                                    print(f"open_pdks {version}", file=f)
+            for variant in variants:
+                variant_install_path = os.path.join(version_directory, variant)
+                variant_sources_file = os.path.join(variant_install_path, "SOURCES")
+                if not os.path.isfile(variant_sources_file):
+                    with open(variant_sources_file, "w") as f:
+                        print(f"open_pdks {version}", file=f)
 
-                        os.unlink(tarball_path)
+            os.unlink(tarball_path)
 
     with console.status(f"Enabling version {version}…"):
         for path in final_paths:
@@ -334,8 +368,15 @@ def enable(
     default=None,
     help="Explicitly define a tool metadata file instead of searching for a metadata file",
 )
+@click.option(
+    "-l",
+    "--include-libraries",
+    multiple=True,
+    default=None,
+    help="Libraries to include. You can use -l multiple times to include multiple libraries. Pass 'all' to include all of them. A default of 'None' uses a default set for the particular PDK.",
+)
 @click.argument("version", required=False)
-def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version):
+def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version, include_libraries):
     """
     Activates a given installed PDK version.
 
@@ -345,9 +386,17 @@ def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version):
     tools with a tool_metadata.yml file, for example OpenLane or DFFRAM,
     the appropriate version will be enabled automatically.
     """
+    if include_libraries == ():
+        include_libraries = None
+
     console = Console()
     version = check_version(version, tool_metadata_file_path, console)
-    enable(pdk_root=pdk_root, pdk=pdk, version=version)
+    enable(
+        pdk_root=pdk_root,
+        pdk=pdk,
+        version=version,
+        include_libraries=include_libraries,
+    )
 
 
 @click.command("enable_or_build", hidden=True)
@@ -366,7 +415,6 @@ def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version):
 def enable_or_build_cmd(
     include_libraries,
     jobs,
-    sram,
     pdk_root,
     pdk,
     owner,
@@ -386,6 +434,9 @@ def enable_or_build_cmd(
 
     Parameters: <version>
     """
+    if include_libraries == ():
+        include_libraries = None
+
     console = Console()
     version = check_version(version, tool_metadata_file_path, console)
     enable(
@@ -397,7 +448,6 @@ def enable_or_build_cmd(
         build_kwargs={
             "include_libraries": include_libraries,
             "jobs": jobs,
-            "sram": sram,
             "clear_build_artifacts": clear_build_artifacts,
             "use_repo_at": use_repo_at,
             "build_magic": build_magic,
@@ -408,4 +458,5 @@ def enable_or_build_cmd(
             "token": token,
             "pre": pre,
         },
+        include_libraries=include_libraries,
     )

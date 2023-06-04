@@ -21,6 +21,7 @@ import subprocess
 from typing import Optional, List
 
 import click
+import zstandard as zstd
 from rich.console import Console
 from rich.progress import Progress
 
@@ -46,7 +47,7 @@ def build(
     pdk: str,
     version: str,
     jobs: int = 1,
-    sram: bool = True,
+    sram: bool = True,  # Deprecated
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     use_repo_at: Optional[List[str]] = None,
@@ -65,7 +66,6 @@ def build(
         "pdk_root": pdk_root,
         "version": version,
         "jobs": jobs,
-        "sram": sram,
         "clear_build_artifacts": clear_build_artifacts,
         "include_libraries": include_libraries,
         "using_repos": use_repos,
@@ -91,7 +91,6 @@ def build(
 def build_cmd(
     include_libraries,
     jobs,
-    sram,
     pdk_root,
     pdk,
     clear_build_artifacts,
@@ -109,6 +108,8 @@ def build_cmd(
     tools with a tool_metadata.yml file, for example OpenLane or DFFRAM,
     the appropriate version will be enabled automatically.
     """
+    if include_libraries == ():
+        include_libraries = None
 
     version = check_version(version, tool_metadata_file_path, Console())
     build(
@@ -116,7 +117,6 @@ def build_cmd(
         pdk=pdk,
         version=version,
         jobs=jobs,
-        sram=sram,
         clear_build_artifacts=clear_build_artifacts,
         include_libraries=include_libraries,
         use_repo_at=use_repo_at,
@@ -144,18 +144,35 @@ def push(
     tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}", version)
     mkdirp(tarball_directory)
 
-    tarball_path = os.path.join(tarball_directory, "default.tar.xz")
+    final_tarballs = []
 
     with Progress() as progress:
+        collections = {"common": []}
         path_it = pathlib.Path(version_directory).glob("**/*")
-        files = [str(path) for path in path_it if path.is_file()]
-        task = progress.add_task("Compressing…", total=len(files))
-        with tarfile.open(tarball_path, mode="w:xz") as tf:
-            for i, file in enumerate(files):
-                progress.update(task, completed=i + 1)
-                path_in_tarball = os.path.relpath(file, version_directory)
-                tf.add(file, arcname=path_in_tarball)
-    console.log(f"Compressed to {tarball_path}.")
+        for path in path_it:
+            if not path.is_file():
+                continue
+            relative = os.path.relpath(path, version_directory)
+            path_components = relative.split(os.sep)
+            if path_components[1] == "libs.ref":
+                lib = path_components[2]
+                collections[lib] = collections.get(lib) or []
+                collections[lib].append(str(path))
+            else:
+                collections["common"].append(str(path))
+
+        for name, files in collections.items():
+            tarball_path = os.path.join(tarball_directory, f"{name}.tar.zst")
+            task = progress.add_task(f"Compressing {name}…", total=len(files))
+            with zstd.open(tarball_path, mode="wb") as stream:
+                with tarfile.TarFile(fileobj=stream, mode="w") as tf:
+                    for i, file in enumerate(files):
+                        progress.update(task, completed=i + 1)
+                        path_in_tarball = os.path.relpath(file, version_directory)
+                        tf.add(file, arcname=path_in_tarball)
+            console.log(f"\nCompressed to {tarball_path}.")
+            progress.remove_task(task)
+            final_tarballs.append(tarball_path)
 
     tag = f"{pdk}-{version}"
 
@@ -166,27 +183,29 @@ def push(
     date = get_date_of(version)
     if date is not None:
         body = f"{pdk} variants built using open_pdks {version} (released on {date_to_iso8601(date)})"
-    subprocess.check_call(
-        [
-            "ghr",
-            "-owner",
-            owner,
-            "-repository",
-            repository,
-            "-token",
-            token,
-            "-body",
-            body,
-            "-commitish",
-            "releases",
-            "-replace",
-        ]
-        + (["-prerelease"] if pre else [])
-        + [
-            tag,
-            tarball_path,
-        ]
-    )
+
+    for tarball_path in final_tarballs:
+        subprocess.check_call(
+            [
+                "ghr",
+                "-owner",
+                owner,
+                "-repository",
+                repository,
+                "-token",
+                token,
+                "-body",
+                body,
+                "-commitish",
+                "releases",
+                "-replace",
+            ]
+            + (["-prerelease"] if pre else [])
+            + [
+                tag,
+                tarball_path,
+            ]
+        )
     console.log("Done.")
 
 

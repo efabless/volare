@@ -21,5 +21,6 @@ with pkgs; with python3.pkgs; buildPythonPackage rec {
     rich
     requests
     pcpp
+    zstandard
   ];
 }

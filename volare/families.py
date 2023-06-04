@@ -17,12 +17,34 @@ from typing import List, Dict
 class Family(object):
     by_name: Dict[str, "Family"] = {}
 
-    def __init__(self, name: str, variants: List[str]):
+    def __init__(self, name: str, variants: List[str], default_includes: List[str]):
         self.name = name
         self.variants = variants
+        self.default_includes = default_includes
 
 
 Family.by_name = {}
-Family.by_name["sky130"] = Family("sky130", ["sky130A", "sky130B"])
-Family.by_name["gf180mcu"] = Family("gf180mcu", ["gf180mcuA", "gf180mcuB", "gf180mcuC"])
-Family.by_name["asap7"] = Family("asap7", ["asap7"])
+Family.by_name["sky130"] = Family(
+    "sky130",
+    ["sky130A", "sky130B"],
+    [
+        "sky130_fd_io",
+        "sky130_fd_pr",
+        "sky130_fd_sc_hd",
+        "sky130_fd_sc_hvl",
+        "sky130_ml_xx_hd",
+        "sky130_sram_macros",
+    ],
+)
+Family.by_name["gf180mcu"] = Family(
+    "gf180mcu",
+    ["gf180mcuA", "gf180mcuB", "gf180mcuC"],
+    [
+        "gf180mcu_fd_io",
+        "gf180mcu_fd_pr",
+        "gf180mcu_fd_sc_mcu7t5v0",
+        "gf180mcu_fd_sc_mcu9t5v0",
+        "gf180mcu_fd_ip_sram",
+    ],
+)
+Family.by_name["asap7"] = Family("asap7", ["asap7"], default_includes=[])

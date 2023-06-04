@@ -140,7 +140,6 @@ def build(
     pdk_root: str,
     version: str,
     jobs: int = 1,
-    sram: bool = True,
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     using_repos: Optional[Dict[str, str]] = None,
