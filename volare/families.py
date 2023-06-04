@@ -44,7 +44,7 @@ Family.by_name["gf180mcu"] = Family(
         "gf180mcu_fd_pr",
         "gf180mcu_fd_sc_mcu7t5v0",
         "gf180mcu_fd_sc_mcu9t5v0",
-        "gf180mcu_fd_bd_sram",
+        "gf180mcu_fd_ip_sram",
     ],
 )
 Family.by_name["asap7"] = Family("asap7", ["asap7"], default_includes=[])

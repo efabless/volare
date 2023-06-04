@@ -68,7 +68,7 @@ In its current inception, volare supports builds of **sky130** and **gf180mcu** 
 |sky130_fd_pr|gf180mcu_fd_pr|
 |sky130_fd_sc_hd|gf180mcu_fd_sc_mcu7t5v0|
 |sky130_fd_sc_hvl|gf180mcu_fd_sc_mcu9t5v0|
-|sky130 sram modules|gf180mcu_fd_bd_sram|
+|sky130 sram modules|gf180mcu_fd_ip_sram|
 
 All builds are identified by their **open_pdks** commit hash.
 

@@ -121,7 +121,9 @@ LIB_FLAG_MAP = {
     "gf180mcu_fd_sc_mcu7t5v0": "--enable-sc-7t5v0-gf180mcu",
     "gf180mcu_fd_sc_mcu9t5v0": "--enable-sc-9t5v0-gf180mcu",
     "gf180mcu_fd_io": "--enable-io-gf180mcu",
-    "gf180mcu_fd_bd_sram": "--enable-sram-gf180mcu",
+    "gf180mcu_fd_ip_sram": "--enable-sram-gf180mcu",
+    "gf180mcu_osu_sc_gp12t3v3": "--enable-osu-sc-gf180mcu",
+    "gf180mcu_osu_sc_gp9t3v3": "--enable-osu-sc-gf180mcu",
 }
 
 
@@ -149,7 +151,7 @@ def build_variants(
                 )
                 raise e
 
-        library_flags = [LIB_FLAG_MAP[library] for library in include_libraries]
+        library_flags = set([LIB_FLAG_MAP[library] for library in include_libraries])
         magic_dirname = os.path.dirname(magic_bin)
 
         with console.status("Configuring open_pdks…"):
