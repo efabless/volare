@@ -366,19 +366,13 @@ def build(
     pdk_root: str,
     version: str,
     jobs: int = 1,
-    sram: bool = True,
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     using_repos: Optional[Dict[str, str]] = None,
     build_magic: bool = False,
 ):
-    if include_libraries is None or len(include_libraries) == 0:
-        include_libraries = [
-            "sky130_fd_sc_hd",
-            "sky130_fd_sc_hvl",
-            "sky130_fd_io",
-            "sky130_fd_pr",
-        ]
+    if include_libraries is None:
+        include_libraries = Family.by_name["sky130"].default_includes
 
     if using_repos is None:
         using_repos = {}
@@ -403,7 +397,7 @@ def build(
         magic_tag,
         lambda magic_bin: build_variants(
             magic_bin,
-            sram,
+            "sky130_sram_macros" in include_libraries,
             build_directory,
             open_pdks_path,
             sky130_path,

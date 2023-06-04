@@ -14,13 +14,16 @@
 import os
 import re
 import json
+import shutil
 import pathlib
 from datetime import datetime
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict, Tuple, Union
 
 import requests
 from rich.console import Console
+
+from .families import Family
 
 # Datetime Helpers
 ISO8601_FMT = "%Y-%m-%dT%H:%M:%SZ"
@@ -65,6 +68,19 @@ class RepoMetadata(object):
         self.default_branch = default_branch
 
 
+def _get_current_version(pdk_root: str, pdk: str) -> Optional[str]:
+    current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
+    current_file_dir = os.path.dirname(current_file)
+    mkdirp(current_file_dir)
+    version = None
+    try:
+        version = open(current_file).read().strip()
+    except FileNotFoundError:
+        pass
+
+    return version
+
+
 @dataclass
 class Version(object):
     name: str
@@ -72,16 +88,67 @@ class Version(object):
     commit_date: Optional[datetime] = None
     upload_date: Optional[datetime] = None
     prerelease: bool = False
-    path: Optional[str] = None
 
     def __lt__(self, rhs: "Version"):
         return (self.commit_date or datetime.min) < (rhs.commit_date or datetime.min)
 
-    def is_current(self, pdk_root: str) -> bool:
-        return self.name == get_current_version(pdk_root, self.pdk)
-
     def __str__(self) -> str:
         return self.name
+
+    def is_installed(self, pdk_root: str) -> bool:
+        version_dir = get_version_dir(pdk_root, self.pdk, self.name)
+        return os.path.isdir(version_dir)
+
+    def is_current(self, pdk_root: str) -> bool:
+        return self.name == _get_current_version(pdk_root, self.pdk)
+
+    def get_dir(self, pdk_root: str) -> str:
+        return get_version_dir(pdk_root, self.pdk, self.name)
+
+    def unset_current(self, pdk_root: str):
+        if not self.is_installed(pdk_root):
+            return
+        if not self.is_current(pdk_root):
+            return
+
+        for variant in Family.by_name[self.pdk].variants:
+            os.unlink(os.path.join(pdk_root, variant))
+
+        current_file = os.path.join(get_volare_dir(pdk_root, self.pdk), "current")
+        os.unlink(current_file)
+
+    def uninstall(self, pdk_root: str):
+        if not self.is_installed(pdk_root):
+            raise ValueError(
+                f"Version {self.name} of the {self.pdk} PDK is not installed."
+            )
+
+        self.unset_current(pdk_root)
+
+        version_dir = self.get_dir(pdk_root)
+
+        shutil.rmtree(version_dir)
+
+    @classmethod
+    def get_current(Self, pdk_root: str, pdk: str) -> Optional["Version"]:
+        current_version = _get_current_version(pdk_root, pdk)
+        if current_version is None:
+            return None
+
+        return Version(current_version, pdk)
+
+    @classmethod
+    def get_all_installed(Self, pdk_root: str, pdk: str) -> List["Version"]:
+        versions_dir = get_versions_dir(pdk_root, pdk)
+        mkdirp(versions_dir)
+        return [
+            Version(
+                name=version,
+                pdk=pdk,
+            )
+            for version in os.listdir(versions_dir)
+            if os.path.isdir(os.path.join(versions_dir, version))
+        ]
 
     @classmethod
     def _from_github(Self) -> Dict[str, List["Version"]]:
@@ -200,8 +267,48 @@ def get_version_dir(pdk_root: str, pdk: str, version: Union[str, Version]) -> st
     return os.path.join(get_versions_dir(pdk_root, pdk), str(version))
 
 
-def get_link_of(version: str, pdk: str) -> str:
-    return f"{VOLARE_REPO_HTTPS}/releases/download/{pdk}-{version}/default.tar.xz"
+def get_link_of(version: str, pdk: str, classic: bool = False) -> str:
+    if classic:
+        return f"{VOLARE_REPO_HTTPS}/releases/download/{pdk}-{version}/default.tar.xz"
+    else:
+        return f"{VOLARE_REPO_HTTPS}/releases/download/{pdk}-{version}/common.tar.zst"
+
+
+def get_release_links(
+    version: str,
+    pdk: str,
+    scl_filter: Optional[List[str]] = None,
+) -> Optional[List[Tuple[str, str]]]:
+    default_filter = False
+    if scl_filter is None:
+        default_filter = True
+        scl_filter = Family.by_name[pdk].default_includes
+
+    release_api_link = f"{VOLARE_REPO_API}/releases/tags/{pdk}-{version}"
+    releases = requests.get(release_api_link, json=True)
+    if releases.status_code >= 400:
+        return None
+    assets = releases.json()["assets"]
+    zst_files = []
+    xz_file = None
+    for asset in assets:
+        if default_filter and asset["name"] == "default.tar.xz":
+            xz_file = (asset["name"], asset["browser_download_url"])
+        elif asset["name"].endswith(".tar.zst"):
+            asset_scl = asset["name"][:-8]
+            if asset_scl == "common" or "all" in scl_filter or asset_scl in scl_filter:
+                zst_files.append((asset["name"], asset["browser_download_url"]))
+
+    if len(zst_files):
+        return zst_files
+    if xz_file is not None:
+        return [xz_file]
+    if scl_filter is not None:
+        raise ValueError(f"No files found for standard cell libraries: {scl_filter}.")
+
+    raise Exception(
+        f"The release for {pdk}-{version} is malformed. Please file a bug report."
+    )
 
 
 def get_logs_dir() -> str:
@@ -228,26 +335,7 @@ def get_date_of(opdks_commit: str) -> Optional[datetime]:
 
 
 def get_installed_list(pdk_root: str, pdk: str) -> List[Version]:
-    versions_dir = get_versions_dir(pdk_root, pdk)
-    mkdirp(versions_dir)
-    return [
-        Version(
-            name=version,
-            pdk=pdk,
-            path=os.path.join(versions_dir, version),
-        )
-        for version in os.listdir(versions_dir)
-    ]
+    return Version.get_all_installed(pdk_root, pdk)
 
-
-def get_current_version(pdk_root: str, pdk: str) -> str:
-    current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
-    current_file_dir = os.path.dirname(current_file)
-    mkdirp(current_file_dir)
-    version = ""
-    try:
-        version = open(current_file).read().strip()
-    except FileNotFoundError:
-        pass
-
-    return version
+def get_current_version(pdk_root: str, pdk: str) -> Optional[str]:
+    return _get_current_version(pdk_root, pdk)

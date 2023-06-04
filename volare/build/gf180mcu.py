@@ -230,22 +230,15 @@ def build(
     pdk_root: str,
     version: str,
     jobs: int = 1,
-    sram: bool = True,
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     using_repos: Optional[Dict[str, str]] = None,
     build_magic: bool = False,
 ):
-    if include_libraries is None or len(include_libraries) == 0:
-        include_libraries = [
-            "gf180mcu_fd_sc_mcu7t5v0",
-            "gf180mcu_fd_sc_mcu9t5v0",
-            "gf180mcu_fd_io",
-            "gf180mcu_fd_pr",
-        ]
+    if include_libraries is None:
+        include_libraries = Family.by_name["gf180mcu"].default_includes
 
-    if sram:
-        include_libraries.append("gf180mcu_fd_bd_sram")
+    include_libraries = set(include_libraries)
 
     if using_repos is None:
         using_repos = {}
@@ -267,7 +260,7 @@ def build(
         magic_tag,
         lambda magic_bin: build_variants(
             magic_bin,
-            include_libraries,
+            list(include_libraries),
             build_directory,
             open_pdks_path,
             log_dir,
