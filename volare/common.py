@@ -337,5 +337,6 @@ def get_date_of(opdks_commit: str) -> Optional[datetime]:
 def get_installed_list(pdk_root: str, pdk: str) -> List[Version]:
     return Version.get_all_installed(pdk_root, pdk)
 
+
 def get_current_version(pdk_root: str, pdk: str) -> Optional[str]:
     return _get_current_version(pdk_root, pdk)
