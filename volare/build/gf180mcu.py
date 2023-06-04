@@ -236,9 +236,9 @@ def build(
     build_magic: bool = False,
 ):
     if include_libraries is None:
-        include_libraries = Family.by_name["gf180mcu"].default_includes
-
-    include_libraries = set(include_libraries)
+        include_libraries = Family.by_name["gf180mcu"].default_includes.copy()
+    if "all" in include_libraries:
+        include_libraries = list(LIB_FLAG_MAP.keys())
 
     if using_repos is None:
         using_repos = {}
