@@ -234,7 +234,7 @@ def check_version(
                 pr(
                     "Any of ./tool_metadata.yml or ./dependencies/tool_metadata.yml not found. You'll need to specify the file path or the commits explicitly."
                 )
-                exit(os.EX_USAGE)
+                exit(-1)
 
     tool_metadata = yaml.safe_load(open(tool_metadata_file_path).read())
 
@@ -242,7 +242,7 @@ def check_version(
 
     if len(open_pdks_list) < 1:
         pr("No entry for open_pdks found in tool_metadata.yml")
-        exit(os.EX_USAGE)
+        exit(-1)
 
     version = open_pdks_list[0]["commit"]
 
@@ -309,13 +309,6 @@ def get_release_links(
     raise Exception(
         f"The release for {pdk}-{version} is malformed. Please file a bug report."
     )
-
-
-def get_logs_dir() -> str:
-    if os.getenv("VOLARE_LOGS") is not None:
-        return os.environ["VOLARE_LOGS"]
-    else:
-        return os.path.join(VOLARE_RESOLVED_HOME, "volare", "logs")
 
 
 def get_date_of(opdks_commit: str) -> Optional[datetime]:

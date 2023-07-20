@@ -62,7 +62,7 @@ def get_orfs(version, build_directory, jobs=1):
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stderr)
-        exit(os.EX_DATAERR)
+        exit(-1)
 
 
 def build_variants(build_directory, jobs):

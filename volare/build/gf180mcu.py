@@ -27,7 +27,6 @@ from rich.progress import Progress
 from .magic import with_magic
 from .git_multi_clone import GitMultiClone
 from ..common import (
-    get_logs_dir,
     get_version_dir,
     get_volare_dir,
     mkdirp,
@@ -113,7 +112,7 @@ def get_open_pdks(
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stderr)
-        exit(os.EX_DATAERR)
+        exit(-1)
 
 
 LIB_FLAG_MAP = {
@@ -194,7 +193,7 @@ def build_variants(
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stderr)
-        exit(os.EX_DATAERR)
+        exit(-1)
 
 
 def install_gf180mcu(build_directory, pdk_root, version):
@@ -240,21 +239,21 @@ def build(
     if include_libraries is None:
         include_libraries = Family.by_name["gf180mcu"].default_includes.copy()
     if "all" in include_libraries:
-        include_libraries = list(LIB_FLAG_MAP.keys())
+        include_libraries = Family.by_name["gf180mcu"].all_libraries.copy()
 
     if using_repos is None:
         using_repos = {}
 
     timestamp = datetime.now().strftime("build_gf180mcu-%Y-%m-%d-%H-%M-%S")
-    log_dir = os.path.join(get_logs_dir(), timestamp)
+    build_directory = os.path.join(
+        get_volare_dir(pdk_root, "gf180mcu"), "build", version
+    )
+    log_dir = os.path.join(build_directory, "logs", timestamp)
     mkdirp(log_dir)
 
     console = Console()
     console.log(f"Logging to '{log_dir}'…")
 
-    build_directory = os.path.join(
-        get_volare_dir(pdk_root, "gf180mcu"), "build", version
-    )
     open_pdks_path, _, magic_tag = get_open_pdks(
         version, build_directory, jobs, using_repos.get("open_pdks")
     )
