@@ -28,7 +28,6 @@ from rich.progress import Progress
 from .git_multi_clone import GitMultiClone
 from .magic import with_magic
 from ..common import (
-    get_logs_dir,
     get_version_dir,
     get_volare_dir,
     mkdirp,
@@ -114,7 +113,7 @@ def get_open_pdks(
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stderr)
-        exit(os.EX_DATAERR)
+        exit(-1)
 
 
 def get_sky130(
@@ -124,7 +123,6 @@ def get_sky130(
         if repo_path is not None:
             return repo_path
 
-        all = "all" in include_libraries
         console = Console()
 
         sky130_repo = None
@@ -159,7 +157,7 @@ def get_sky130(
                 sky130_submodules_filtered = [
                     sm
                     for sm in sky130_submodules
-                    if (sm.split("/")[1] in include_libraries or all)
+                    if (sm.split("/")[1] in include_libraries)
                 ]
                 for submodule in sky130_submodules_filtered:
                     executor.submit(
@@ -171,7 +169,7 @@ def get_sky130(
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stderr)
-        exit(os.EX_DATAERR)
+        exit(-1)
 
 
 def build_sky130_timing(build_directory, sky130_path, log_dir, jobs=1):
@@ -253,7 +251,7 @@ def build_sky130_timing(build_directory, sky130_path, log_dir, jobs=1):
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stderr)
-        exit(os.EX_DATAERR)
+        exit(-1)
 
 
 def build_variants(
@@ -271,6 +269,9 @@ def build_variants(
 
         def run_sh(script, log_to):
             output_file = open(log_to, "w")
+            output_file.write(script + "\n")
+            output_file.write("---\n")
+            output_file.flush()
             try:
                 subprocess.check_call(
                     ["sh", "-c", script],
@@ -328,7 +329,7 @@ def build_variants(
     except subprocess.CalledProcessError as e:
         print(e)
         print(e.stderr)
-        exit(os.EX_DATAERR)
+        exit(-1)
 
 
 def install_sky130(build_directory, pdk_root, version):
@@ -372,19 +373,21 @@ def build(
     build_magic: bool = False,
 ):
     if include_libraries is None:
-        include_libraries = Family.by_name["sky130"].default_includes
+        include_libraries = Family.by_name["sky130"].default_includes.copy()
+    if "all" in include_libraries:
+        include_libraries = Family.by_name["sky130"].all_libraries.copy()
 
     if using_repos is None:
         using_repos = {}
 
+    build_directory = os.path.join(get_volare_dir(pdk_root, "sky130"), "build", version)
     timestamp = datetime.now().strftime("build_sky130-%Y-%m-%d-%H-%M-%S")
-    log_dir = os.path.join(get_logs_dir(), timestamp)
+    log_dir = os.path.join(build_directory, "logs", timestamp)
     mkdirp(log_dir)
 
     console = Console()
     console.log(f"Logging to '{log_dir}'…")
 
-    build_directory = os.path.join(get_volare_dir(pdk_root, "sky130"), "build", version)
     open_pdks_path, sky130_tag, magic_tag = get_open_pdks(
         version, build_directory, jobs, using_repos.get("open_pdks")
     )
@@ -392,6 +395,10 @@ def build(
         include_libraries, build_directory, sky130_tag, jobs, using_repos.get("sky130")
     )
     build_sky130_timing(build_directory, sky130_path, log_dir, jobs)
+
+    # magic_tag = ""
+    # open_pdks_path = os.path.join(build_directory, "open_pdks")
+    # sky130_path = os.path.join(build_directory, "skywater-pdk")
 
     with_magic(
         magic_tag,

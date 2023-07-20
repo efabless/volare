@@ -93,9 +93,18 @@ def opt_push(function: Callable):
         "-t",
         "--token",
         default=os.getenv("GITHUB_TOKEN"),
+        required=os.getenv("GITHUB_TOKEN") is None,
         help="Github Token",
     )(function)
     function = opt(
         "--pre/--prod", default=False, help="Push as pre-release or production"
+    )(function)
+    function = opt(
+        "-L",
+        "--push-library",
+        "push_libraries",
+        multiple=True,
+        default=None,
+        help="Push only libraries in this list. You can use -L multiple times to include multiple libraries. Pass 'None' to push all libraries built.",
     )(function)
     return function

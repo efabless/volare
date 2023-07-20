@@ -132,13 +132,19 @@ def push(
     repository=VOLARE_REPO_NAME,
     token=os.getenv("GITHUB_TOKEN"),
     pre=False,
+    push_libraries=None,
 ):
     console = Console()
+
+    if push_libraries is None:
+        push_libraries = Family.by_name["PDK"].all_libraries
+
+    library_list = set(push_libraries)
 
     version_directory = get_version_dir(pdk_root, pdk, version)
     if not os.path.isdir(version_directory):
         console.print("[red]Version not found.")
-        exit(os.EX_NOINPUT)
+        exit(-1)
 
     tempdir = tempfile.gettempdir()
     tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}", version)
@@ -156,6 +162,8 @@ def push(
             path_components = relative.split(os.sep)
             if path_components[1] == "libs.ref":
                 lib = path_components[2]
+                if lib not in library_list:
+                    continue
                 collections[lib] = collections.get(lib) or []
                 collections[lib].append(str(path))
             else:
@@ -213,7 +221,7 @@ def push(
 @opt_pdk_root
 @opt_push
 @click.argument("version")
-def push_cmd(owner, repository, token, pre, pdk_root, pdk, version):
+def push_cmd(owner, repository, token, pre, pdk_root, pdk, version, push_libraries):
     """
     For maintainers: Package and release a build to the public.
 
@@ -221,4 +229,4 @@ def push_cmd(owner, repository, token, pre, pdk_root, pdk, version):
 
     Parameters: <version> (required)
     """
-    push(pdk_root, pdk, version, owner, repository, token, pre)
+    push(pdk_root, pdk, version, owner, repository, token, pre, push_libraries)
