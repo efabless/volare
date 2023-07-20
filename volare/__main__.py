@@ -200,7 +200,7 @@ def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version, include_librarie
             pdk=pdk,
             version=version,
             include_libraries=include_libraries,
-            console=console,
+            output=console,
         )
     except Exception as e:
         console.print(f"[red]{e}")
@@ -268,6 +268,7 @@ def enable_or_build_cmd(
                 "pre": pre,
             },
             include_libraries=include_libraries,
+            output=console,
         )
     except Exception as e:
         console.print(f"[red]{e}")
