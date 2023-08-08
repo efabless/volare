@@ -196,7 +196,7 @@ def build_variants(
         console.log("Fixed file ownership.")
         with console.status("Cleaning build artifacts…"):
             run_sh(
-                f"""
+                """
                 set -e
                 rm -rf sources
                 """,
