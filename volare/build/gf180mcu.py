@@ -151,6 +151,13 @@ def build_variants(
                 raise e
 
         library_flags = set([LIB_FLAG_MAP[library] for library in include_libraries])
+        library_flags_disable = set(
+            [
+                LIB_FLAG_MAP[library].replace("enable", "disable")
+                for library in LIB_FLAG_MAP
+                if library not in include_libraries
+            ]
+        )
         magic_dirname = os.path.dirname(magic_bin)
 
         with console.status("Configuring open_pdks…"):
@@ -158,7 +165,7 @@ def build_variants(
                 f"""
                     set -e
                     export PATH="{magic_dirname}:$PATH"
-                    ./configure --enable-gf180mcu-pdk {' '.join(library_flags)} --with-reference
+                    ./configure --enable-gf180mcu-pdk {' '.join(library_flags)} {' '.join(library_flags_disable)} --with-reference
                 """,
                 log_to=os.path.join(log_dir, "config.log"),
             )
@@ -187,6 +194,15 @@ def build_variants(
                 log_to=os.path.join(log_dir, "ownership.log"),
             )
         console.log("Fixed file ownership.")
+        with console.status("Cleaning build artifacts…"):
+            run_sh(
+                f"""
+                set -e
+                rm -rf sources
+                """,
+                log_to=os.path.join(log_dir, "clean.log"),
+            )
+        console.log("Cleaned build artifacts.")
 
         console.log("Done.")
 

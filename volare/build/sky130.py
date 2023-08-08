@@ -344,6 +344,15 @@ def build_variants(
                 log_to=os.path.join(log_dir, "ownership.log"),
             )
         console.log("Fixed file ownership.")
+        with console.status("Cleaning build artifacts…"):
+            run_sh(
+                f"""
+                set -e
+                rm -rf sources
+                """,
+                log_to=os.path.join(log_dir, "clean.log"),
+            )
+        console.log("Cleaned build artifacts.")
 
         console.log("Done.")
 
