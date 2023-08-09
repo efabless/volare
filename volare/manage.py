@@ -145,7 +145,9 @@ def enable(
                 build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
                 if also_push:
                     if push_kwargs["push_libraries"] is None:
-                        push_kwargs["push_libraries"] = Family.by_name[pdk].default_includes.copy()
+                        push_kwargs["push_libraries"] = Family.by_name[
+                            pdk
+                        ].default_includes.copy()
                     push(pdk_root=pdk_root, pdk=pdk, version=version, **push_kwargs)
             else:
                 raise FileNotFoundError(
