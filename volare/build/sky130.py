@@ -94,18 +94,17 @@ def get_open_pdks(
             manifest = json.loads(json_str)
             reference_commits = manifest["reference"]
             magic_tag = reference_commits["magic"]
-            sky130_tag = reference_commits["skywater_pdk"]
         except FileNotFoundError:
             console.log(
-                "Cannot find open_pdks/sky130 JSON manifest. Default versions for sky130/magic will be used."
+                "Cannot find open_pdks/sky130 JSON manifest. Default version for magic will be used."
             )
         except json.JSONDecodeError:
             console.log(
-                "Failed to parse open_pdks/sky130 JSON manifest. Default versions for sky130/magic will be used."
+                "Failed to parse open_pdks/sky130 JSON manifest. Default version for magic will be used."
             )
         except KeyError:
             console.log(
-                "Failed to extract reference commits from open_pdks/sky130 JSON manifest. Default versions for sky130/magic will be used."
+                "Failed to extract reference commits from open_pdks/sky130 JSON manifest. Default version for magic will be used."
             )
 
         return (repo_path, sky130_tag, magic_tag)
@@ -254,12 +253,27 @@ def build_sky130_timing(build_directory, sky130_path, log_dir, jobs=1):
         exit(-1)
 
 
+LIB_FLAG_MAP = {
+    "sky130_fd_io": "--enable-io-sky130",
+    "sky130_fd_pr": "--enable-primitive-sky130",
+    "sky130_fd_pr_reram": "",
+    "sky130_ml_xx_hd": "--enable-alpha-sky130",
+    "sky130_fd_sc_hd": "--enable-sc-hd-sky130",
+    "sky130_fd_sc_hdll": "--enable-sc-hdll-sky130",
+    "sky130_fd_sc_lp": "--enable-sc-lp-sky130",
+    "sky130_fd_sc_hvl": "--enable-sc-hvl-sky130",
+    "sky130_fd_sc_ls": "--enable-sc-ls-sky130",
+    "sky130_fd_sc_ms": "--enable-sc-ms-sky130",
+    "sky130_fd_sc_hs": "--enable-sc-hs-sky130",
+    "sky130_sram_macros": "--enable-sram-sky130",
+}
+
+
 def build_variants(
     magic_bin,
-    sram,
     build_directory,
     open_pdks_path,
-    sky130_path,
+    include_libraries,
     log_dir,
     jobs=1,
 ):
@@ -286,15 +300,23 @@ def build_variants(
                 )
                 raise e
 
-        sram_opt = "--enable-sram-sky130" if sram else ""
         magic_dirname = os.path.dirname(magic_bin)
+        library_flags = set([LIB_FLAG_MAP[library] for library in include_libraries])
+        library_flags_disable = set(
+            [
+                LIB_FLAG_MAP[library].replace("enable", "disable")
+                for library in LIB_FLAG_MAP
+                if library not in include_libraries
+            ]
+        )
+        console.log(f'Using libraries {" ".join(library_flags)}')
 
         with console.status("Configuring open_pdks…"):
             run_sh(
                 f"""
                     set -e
                     export PATH="{magic_dirname}:$PATH"
-                    ./configure --enable-sky130-pdk={sky130_path}/libraries {sram_opt} --with-reference
+                    ./configure --enable-sky130-pdk {" ".join(library_flags)} {" ".join(library_flags_disable)} --with-reference
                 """,
                 log_to=os.path.join(log_dir, "config.log"),
             )
@@ -323,6 +345,15 @@ def build_variants(
                 log_to=os.path.join(log_dir, "ownership.log"),
             )
         console.log("Fixed file ownership.")
+        with console.status("Cleaning build artifacts…"):
+            run_sh(
+                """
+                set -e
+                rm -rf sources
+                """,
+                log_to=os.path.join(log_dir, "clean.log"),
+            )
+        console.log("Cleaned build artifacts.")
 
         console.log("Done.")
 
@@ -388,13 +419,9 @@ def build(
     console = Console()
     console.log(f"Logging to '{log_dir}'…")
 
-    open_pdks_path, sky130_tag, magic_tag = get_open_pdks(
+    open_pdks_path, _, magic_tag = get_open_pdks(
         version, build_directory, jobs, using_repos.get("open_pdks")
     )
-    sky130_path = get_sky130(
-        include_libraries, build_directory, sky130_tag, jobs, using_repos.get("sky130")
-    )
-    build_sky130_timing(build_directory, sky130_path, log_dir, jobs)
 
     # magic_tag = ""
     # open_pdks_path = os.path.join(build_directory, "open_pdks")
@@ -404,10 +431,9 @@ def build(
         magic_tag,
         lambda magic_bin: build_variants(
             magic_bin,
-            "sky130_sram_macros" in include_libraries,
             build_directory,
             open_pdks_path,
-            sky130_path,
+            include_libraries,
             log_dir,
             jobs,
         ),
