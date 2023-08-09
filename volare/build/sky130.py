@@ -309,7 +309,6 @@ def build_variants(
                 if library not in include_libraries
             ]
         )
-        console.log(f'Using libraries {" ".join(library_flags)}')
 
         with console.status("Configuring open_pdks…"):
             run_sh(
