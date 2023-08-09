@@ -96,15 +96,15 @@ def get_open_pdks(
             magic_tag = reference_commits["magic"]
         except FileNotFoundError:
             console.log(
-                "Cannot find open_pdks/sky130 JSON manifest. Default versions for magic will be used."
+                "Cannot find open_pdks/sky130 JSON manifest. Default version for magic will be used."
             )
         except json.JSONDecodeError:
             console.log(
-                "Failed to parse open_pdks/sky130 JSON manifest. Default versions for magic will be used."
+                "Failed to parse open_pdks/sky130 JSON manifest. Default version for magic will be used."
             )
         except KeyError:
             console.log(
-                "Failed to extract reference commits from open_pdks/sky130 JSON manifest. Default versions for magic will be used."
+                "Failed to extract reference commits from open_pdks/sky130 JSON manifest. Default version for magic will be used."
             )
 
         return (repo_path, sky130_tag, magic_tag)
