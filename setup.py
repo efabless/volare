@@ -1,15 +1,30 @@
 #!/usr/bin/env python3
+import os
+import subprocess
 from setuptools import setup, find_packages
 
-from volare import __version__
+module_name = "volare"
+
+__dir__ = os.path.dirname(__file__)
+version = subprocess.check_output(
+    [
+        "python3",
+        os.path.join(
+            os.path.abspath(__dir__),
+            module_name,
+            "__version__.py",
+        ),
+    ],
+    encoding="utf8",
+)
 
 requirements = open("requirements.txt").read().strip().split("\n")
 
 setup(
-    name="volare",
+    name=module_name,
     packages=find_packages(),
     package_data={"volare": ["py.typed"]},
-    version=__version__,
+    version=version,
     description="An open_pdks PDK builder/version manager",
     long_description=open("Readme.md").read(),
     long_description_content_type="text/markdown",
