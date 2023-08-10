@@ -245,6 +245,8 @@ def enable_or_build_cmd(
     """
     if include_libraries == ():
         include_libraries = None
+    if push_libraries == ():
+        push_libraries = include_libraries
 
     console = Console()
     version = check_version(version, tool_metadata_file_path, console)
