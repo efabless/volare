@@ -278,7 +278,7 @@ def get_release_links(
     version: str,
     pdk: str,
     scl_filter: Optional[List[str]] = None,
-) -> Optional[List[Tuple[str, str]]]:
+) -> List[Tuple[str, str]]:
     default_filter = False
     if scl_filter is None:
         default_filter = True
@@ -286,8 +286,8 @@ def get_release_links(
 
     release_api_link = f"{VOLARE_REPO_API}/releases/tags/{pdk}-{version}"
     releases = requests.get(release_api_link, json=True)
-    if releases.status_code >= 400:
-        return None
+    releases.raise_for_status()
+
     assets = releases.json()["assets"]
     zst_files = []
     xz_file = None

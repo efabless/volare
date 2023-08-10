@@ -15,11 +15,11 @@ import io
 import os
 import shutil
 import tarfile
-import requests
 import tempfile
 from typing import Any, List, Optional, Union
 
 import rich
+import requests
 import rich.tree
 import rich.progress
 import zstandard as zstd
@@ -137,9 +137,51 @@ def enable(
     final_paths = [os.path.join(pdk_root, variant) for variant in variants]
 
     if not os.path.exists(version_directory):
-        release_link_list = get_release_links(version, pdk, include_libraries)
+        try:
+            release_link_list = get_release_links(version, pdk, include_libraries)
+            tarball_directory = tempfile.TemporaryDirectory(suffix=".volare")
+            for name, link in release_link_list:
+                tarball_path = os.path.join(tarball_directory.name, name)
+                r = requests.get(link, stream=True)
+                with rich.progress.Progress(console=console) as p:
+                    task = p.add_task(
+                        f"Downloading {name}…",
+                        total=int(r.headers["Content-length"]),
+                    )
+                    r.raise_for_status()
+                    with open(tarball_path, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            p.advance(task, advance=len(chunk))
+                            f.write(chunk)
 
-        if release_link_list is None:
+                with console.status(f"Unpacking {name}…"):
+                    stream: Any = None
+                    if name.endswith(".tar.zst"):
+                        stream = zstd.open(tarball_path, mode="rb")
+                    else:
+                        try:
+                            import lzma
+
+                            stream = lzma.open(tarball_path, mode="rb")
+                        except ImportError:
+                            raise OSError(
+                                "Your Python installation does not support xz compression. Either reinstall Python or try a newer PDK version."
+                            )
+                    with tarfile.TarFile(fileobj=stream, mode="r") as tf:
+                        for file in tf:
+                            if file.isdir():
+                                continue
+                            final_path = os.path.join(version_directory, file.name)
+                            final_dir = os.path.dirname(final_path)
+                            mkdirp(final_dir)
+                            io = tf.extractfile(file)
+                            if io is None:
+                                raise IOError(
+                                    f"Failed to unpack file in {name}'s tarball: {file.name}."
+                                )
+                            with open(final_path, "wb") as f:
+                                f.write(io.read())
+        except requests.exceptions.HTTPError as e:
             if build_if_not_found:
                 console.print(f"Version {version} not found, attempting to build…")
                 build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
@@ -151,68 +193,24 @@ def enable(
                     push(pdk_root=pdk_root, pdk=pdk, version=version, **push_kwargs)
             else:
                 raise FileNotFoundError(
-                    f"Version {version} not found either locally or remotely."
+                    f"Version {version} not found either locally or remotely: {e}."
                 )
-        else:
-            try:
-                tarball_directory = tempfile.TemporaryDirectory(suffix=".volare")
-                for name, link in release_link_list:
-                    tarball_path = os.path.join(tarball_directory.name, name)
-                    r = requests.get(link, stream=True)
-                    with rich.progress.Progress(console=console) as p:
-                        task = p.add_task(
-                            f"Downloading {name}…",
-                            total=int(r.headers["Content-length"]),
-                        )
-                        r.raise_for_status()
-                        with open(tarball_path, "wb") as f:
-                            for chunk in r.iter_content(chunk_size=8192):
-                                p.advance(task, advance=len(chunk))
-                                f.write(chunk)
+        except KeyboardInterrupt as e:
+            console.print("Interrupted.")
+            shutil.rmtree(version_directory, ignore_errors=True)
+            raise e from None
+        except Exception as e:
+            shutil.rmtree(version_directory, ignore_errors=True)
+            raise e from None
 
-                    with console.status(f"Unpacking {name}…"):
-                        stream: Any = None
-                        if name.endswith(".tar.zst"):
-                            stream = zstd.open(tarball_path, mode="rb")
-                        else:
-                            try:
-                                import lzma
+        for variant in variants:
+            variant_install_path = os.path.join(version_directory, variant)
+            variant_sources_file = os.path.join(variant_install_path, "SOURCES")
+            if not os.path.isfile(variant_sources_file):
+                with open(variant_sources_file, "w") as f:
+                    print(f"open_pdks {version}", file=f)
 
-                                stream = lzma.open(tarball_path, mode="rb")
-                            except ImportError:
-                                raise OSError(
-                                    "Your Python installation does not support xz compression. Either reinstall Python or try a newer PDK version."
-                                )
-                        with tarfile.TarFile(fileobj=stream, mode="r") as tf:
-                            for file in tf:
-                                if file.isdir():
-                                    continue
-                                final_path = os.path.join(version_directory, file.name)
-                                final_dir = os.path.dirname(final_path)
-                                mkdirp(final_dir)
-                                io = tf.extractfile(file)
-                                if io is None:
-                                    raise IOError(
-                                        f"Failed to unpack file in {name}'s tarball: {file.name}."
-                                    )
-                                with open(final_path, "wb") as f:
-                                    f.write(io.read())
-            except KeyboardInterrupt as e:
-                console.print("Interrupted.")
-                shutil.rmtree(version_directory, ignore_errors=True)
-                raise e from None
-            except Exception as e:
-                shutil.rmtree(version_directory, ignore_errors=True)
-                raise e from None
-
-            for variant in variants:
-                variant_install_path = os.path.join(version_directory, variant)
-                variant_sources_file = os.path.join(variant_install_path, "SOURCES")
-                if not os.path.isfile(variant_sources_file):
-                    with open(variant_sources_file, "w") as f:
-                        print(f"open_pdks {version}", file=f)
-
-            os.unlink(tarball_path)
+        os.unlink(tarball_path)
 
     with console.status(f"Enabling version {version}…"):
         for path in final_paths:
@@ -221,7 +219,7 @@ def enable(
                     os.unlink(path)
                 else:
                     raise FileExistsError(
-                        f"{path} exists, and not as a symlink. Remove it first."
+                        f"{path} exists, and not as a symlink. Remove it then try re-enabling."
                     )
 
         for vpath, fpath in zip(version_paths, final_paths):

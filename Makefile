@@ -1,25 +1,26 @@
+REQ_FILES = ./requirements_dev.txt ./requirements.txt
+REQ_FILES_PFX = $(addprefix -r ,$(REQ_FILES))
+
 all: dist
 
 .PHONY: dist
-dist: venv/created
+dist: venv/manifest.txt
 	./venv/bin/python3 setup.py sdist bdist_wheel
 
 .PHONY: lint
-lint: venv/created
+lint: venv/manifest.txt
 	./venv/bin/black --check .
 	./venv/bin/flake8 .
 	./venv/bin/mypy .
 
-venv: venv/created
-venv/created: ./requirements_dev.txt ./requirements.txt
+venv: venv/manifest.txt
+venv/manifest.txt: $(REQ_FILES)
 	rm -rf venv
 	python3 -m venv ./venv
-	./venv/bin/python3 -m pip install --upgrade pip
-	./venv/bin/python3 -m pip install --upgrade wheel
-	./venv/bin/python3 -m pip install --upgrade\
-		-r ./requirements_dev.txt\
-		-r ./requirements.txt
-	touch venv/created
+	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade pip
+	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade wheel
+	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade $(REQ_FILES_PFX)
+	PYTHONPATH= ./venv/bin/python3 -m pip freeze > $@
 
 .PHONY: veryclean
 veryclean: clean
