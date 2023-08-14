@@ -218,7 +218,6 @@ def enable(
                 with open(variant_sources_file, "w") as f:
                     print(f"open_pdks {version}", file=f)
 
-
     with console.status(f"Enabling version {version}…"):
         for path in final_paths:
             if os.path.exists(path):
