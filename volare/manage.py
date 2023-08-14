@@ -137,11 +137,13 @@ def enable(
     final_paths = [os.path.join(pdk_root, variant) for variant in variants]
 
     if not os.path.exists(version_directory):
+        tarball_paths = []
         try:
             release_link_list = get_release_links(version, pdk, include_libraries)
             tarball_directory = tempfile.TemporaryDirectory(suffix=".volare")
             for name, link in release_link_list:
                 tarball_path = os.path.join(tarball_directory.name, name)
+                tarball_paths.append(tarball_path)
                 r = requests.get(link, stream=True)
                 with rich.progress.Progress(console=console) as p:
                     task = p.add_task(
@@ -202,6 +204,12 @@ def enable(
         except Exception as e:
             shutil.rmtree(version_directory, ignore_errors=True)
             raise e from None
+        finally:
+            for path in tarball_paths:
+                try:
+                    os.unlink(path)
+                except FileNotFoundError:
+                    pass
 
         for variant in variants:
             variant_install_path = os.path.join(version_directory, variant)
@@ -210,7 +218,6 @@ def enable(
                 with open(variant_sources_file, "w") as f:
                     print(f"open_pdks {version}", file=f)
 
-        os.unlink(tarball_path)
 
     with console.status(f"Enabling version {version}…"):
         for path in final_paths:
