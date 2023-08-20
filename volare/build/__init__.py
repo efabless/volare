@@ -25,13 +25,15 @@ import zstandard as zstd
 from rich.console import Console
 from rich.progress import Progress
 
-from ..common import (
-    mkdirp,
-    check_version,
-    get_version_dir,
+from ..github import (
+    get_open_pdks_commit_date,
     VOLARE_REPO_NAME,
     VOLARE_REPO_OWNER,
-    get_date_of,
+)
+from ..common import (
+    mkdirp,
+    resolve_version,
+    get_version_dir,
     date_to_iso8601,
 )
 from ..click_common import (
@@ -111,7 +113,13 @@ def build_cmd(
     if include_libraries == ():
         include_libraries = None
 
-    version = check_version(version, tool_metadata_file_path, Console())
+    console = Console()
+    try:
+        version = resolve_version(version, tool_metadata_file_path)
+    except Exception as e:
+        console.print(f"Could not determine open_pdks version: {e}")
+        exit(-1)
+
     build(
         pdk_root=pdk_root,
         pdk=pdk,
@@ -188,7 +196,7 @@ def push(
     console.log("Starting upload…")
 
     body = f"{pdk} variants built using volare"
-    date = get_date_of(version)
+    date = get_open_pdks_commit_date(version)
     if date is not None:
         body = f"{pdk} variants built using open_pdks {version} (released on {date_to_iso8601(date)})"
 

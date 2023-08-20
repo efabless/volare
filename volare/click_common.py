@@ -17,7 +17,8 @@ from typing import Callable
 
 import click
 
-from .common import VOLARE_RESOLVED_HOME, VOLARE_REPO_OWNER, VOLARE_REPO_NAME
+from .common import VOLARE_RESOLVED_HOME
+from .github import VOLARE_REPO_OWNER, VOLARE_REPO_NAME
 
 opt = partial(click.option, show_default=True)
 
@@ -89,12 +90,12 @@ def opt_push(function: Callable):
     function = opt("-r", "--repository", default=VOLARE_REPO_NAME, help="Repository")(
         function
     )
-    function = opt(
+    function = click.option(
         "-t",
         "--token",
         default=os.getenv("GITHUB_TOKEN"),
         required=os.getenv("GITHUB_TOKEN") is None,
-        help="Github Token",
+        help="Github Token to upload with. If it is not needed, just pass -t NULL or similar. If it exists, the value of the environment variable GITHUB_TOKEN will be used by default.",
     )(function)
     function = opt(
         "--pre/--prod", default=False, help="Push as pre-release or production"
