@@ -44,7 +44,8 @@ def _get_gh_token() -> Optional[str]:
         token = str(hosts["github.com"]["oauth_token"])
 
     # 1. Higher priority: environment GITHUB_TOKEN
-    if env_token := os.getenv("GITHUB_TOKEN"):
+    env_token = os.getenv("GITHUB_TOKEN")
+    if env_token is not None and env_token.strip() != "":
         token = env_token
 
     # 2. Highest priority: the -t flag (set using a callback to the CLI)
@@ -58,8 +59,8 @@ class GitHubCredentials:
 
     def get_session(self) -> requests.Session:
         session = requests.Session()
-        if token := self.token:
-            session.headers = {"Authorization": f"token {token}"}
+        if self.token is not None:
+            session.headers = {"Authorization": f"token {self.token}"}
         return session
 
 

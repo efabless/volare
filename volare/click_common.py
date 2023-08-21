@@ -107,8 +107,8 @@ def set_token_cb(
     param: click.Parameter,
     value: Optional[str],
 ):
-    if token := value:
-        credentials.token = token
+    if value is not None:
+        credentials.token = value
 
 
 def opt_token(function: Callable) -> Callable:
