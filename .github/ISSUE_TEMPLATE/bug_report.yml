@@ -27,6 +27,14 @@ body:
     validations:
       required: true
   - type: textarea
+    id: command
+    attributes:
+      label: Relevant command
+      description: Please copy and paste the relevant Volare command used.
+      render: shell-script
+    validations:
+      required: true
+  - type: textarea
     id: logs
     attributes:
       label: Relevant log output
