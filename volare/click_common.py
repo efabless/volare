@@ -13,30 +13,28 @@
 # limitations under the License.
 import os
 from functools import partial
-from typing import Callable
+from typing import Callable, Optional
 
 import click
 
 from .common import VOLARE_RESOLVED_HOME
-from .github import VOLARE_REPO_OWNER, VOLARE_REPO_NAME
+from .github import VOLARE_REPO_OWNER, VOLARE_REPO_NAME, credentials
 
 opt = partial(click.option, show_default=True)
 
 
 def opt_pdk_root(function: Callable):
-    function = click.option(
+    function = opt(
         "--pdk",
         required=False,
         default=os.getenv("PDK_FAMILY") or "sky130",
         help="The PDK family to install",
-        show_default=True,
     )(function)
-    function = click.option(
+    function = opt(
         "--pdk-root",
         required=False,
         default=VOLARE_RESOLVED_HOME,
         help="Path to the PDK root",
-        show_default=True,
     )(function)
     return function
 
@@ -90,13 +88,6 @@ def opt_push(function: Callable):
     function = opt("-r", "--repository", default=VOLARE_REPO_NAME, help="Repository")(
         function
     )
-    function = click.option(
-        "-t",
-        "--token",
-        default=os.getenv("GITHUB_TOKEN"),
-        required=os.getenv("GITHUB_TOKEN") is None,
-        help="Github Token to upload with. If it is not needed, just pass -t NULL or similar. If it exists, the value of the environment variable GITHUB_TOKEN will be used by default.",
-    )(function)
     function = opt(
         "--pre/--prod", default=False, help="Push as pre-release or production"
     )(function)
@@ -107,5 +98,27 @@ def opt_push(function: Callable):
         multiple=True,
         default=None,
         help="Push only libraries in this list. You can use -L multiple times to include multiple libraries. Pass 'None' to push all libraries built.",
+    )(function)
+    return function
+
+
+def set_token_cb(
+    ctx: click.Context,
+    param: click.Parameter,
+    value: Optional[str],
+):
+    if token := value:
+        credentials.token = token
+
+
+def opt_token(function: Callable) -> Callable:
+    function = opt(
+        "-t",
+        "--token",
+        default=None,
+        required=False,
+        expose_value=False,
+        help="Replace the GitHub token used for GitHub requests, which is by default the value of the environment variable GITHUB_TOKEN or None.",
+        callback=set_token_cb,
     )(function)
     return function

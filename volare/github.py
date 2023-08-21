@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from dataclasses import dataclass
 import os
 import json
+import yaml
 import requests
 from datetime import datetime
+from dataclasses import dataclass
 from typing import Any, List, Mapping, Optional
 
 
@@ -33,23 +34,41 @@ OPDKS_REPO_HTTPS = f"https://github.com/{OPDKS_REPO_ID}"
 OPDKS_REPO_API = f"https://api.github.com/repos/{OPDKS_REPO_ID}"
 
 
+def _get_gh_token() -> Optional[str]:
+    token = None
+
+    # 0. Lowest priority: ghcli's hosts.yml
+    ghcli_file = os.path.join(os.path.expanduser("~/.config/gh/hosts.yml"))
+    if os.path.exists(ghcli_file):
+        hosts = yaml.safe_load(open(ghcli_file))
+        token = str(hosts["github.com"]["oauth_token"])
+
+    # 1. Higher priority: environment GITHUB_TOKEN
+    if env_token := os.getenv("GITHUB_TOKEN"):
+        token = env_token
+
+    # 2. Highest priority: the -t flag (set using a callback to the CLI)
+
+    return token
+
+
 @dataclass
 class GitHubCredentials:
-    username: Optional[str] = os.getenv("VOLARE_GH_USERNAME") or None
-    token: Optional[str] = (
-        os.getenv("VOLARE_GH_TOKEN") or os.getenv("GITHUB_TOKEN") or None
-    )
+    token: Optional[str] = _get_gh_token()
 
     def get_session(self) -> requests.Session:
         session = requests.Session()
-        if None not in [self.username, self.token]:
-            session.auth = (self.username, self.token)
+        if token := self.token:
+            session.headers = {"Authorization": f"token {token}"}
         return session
+
+
+credentials = GitHubCredentials()
 
 
 def get_open_pdks_commit_date(commit: str) -> Optional[datetime]:
     try:
-        request = requests.get(f"{OPDKS_REPO_API}/commits/{commit}")
+        request = credentials.get_session().get(f"{OPDKS_REPO_API}/commits/{commit}")
         request.raise_for_status()
     except requests.exceptions.ConnectionError:
         return None
@@ -64,7 +83,9 @@ def get_open_pdks_commit_date(commit: str) -> Optional[datetime]:
 
 
 def get_releases() -> List[Mapping[str, Any]]:
-    req = requests.get(f"{VOLARE_REPO_API}/releases", params={"per_page": 100})
+    req = credentials.get_session().get(
+        f"{VOLARE_REPO_API}/releases", params={"per_page": 100}
+    )
     req.raise_for_status()
 
     return req.json()
@@ -72,7 +93,7 @@ def get_releases() -> List[Mapping[str, Any]]:
 
 def get_release_links(release: str) -> Mapping[str, Any]:
     release_api_link = f"{VOLARE_REPO_API}/releases/tags/{release}"
-    req = requests.get(release_api_link, json=True)
+    req = credentials.get_session().get(release_api_link, json=True)
     req.raise_for_status()
 
     return req.json()

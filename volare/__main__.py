@@ -28,6 +28,7 @@ from .click_common import (
     opt_build,
     opt_push,
     opt_pdk_root,
+    opt_token,
 )
 from .manage import (
     print_installed_list,
@@ -41,6 +42,7 @@ from .build import (
 
 
 @click.command("output")
+@opt_token
 @opt_pdk_root
 def output_cmd(pdk_root, pdk):
     """Outputs the currently enabled PDK version.
@@ -71,6 +73,7 @@ def output_cmd(pdk_root, pdk):
 
 
 @click.command("prune")
+@opt_token
 @opt_pdk_root
 @click.option(
     "--yes",
@@ -93,6 +96,7 @@ def prune_cmd(pdk_root, pdk):
 
 
 @click.command("rm")
+@opt_token
 @opt_pdk_root
 @click.option(
     "--yes",
@@ -114,6 +118,7 @@ def rm_cmd(pdk_root, pdk, version):
 
 
 @click.command("ls")
+@opt_token
 @opt_pdk_root
 def list_cmd(pdk_root, pdk):
     """Lists PDK versions that are locally installed. JSON if not outputting to a tty."""
@@ -128,6 +133,7 @@ def list_cmd(pdk_root, pdk):
 
 
 @click.command("ls-remote")
+@opt_token
 @opt_pdk_root
 def list_remote_cmd(pdk_root, pdk):
     """Lists PDK versions that are remotely available. JSON if not outputting to a tty."""
@@ -141,6 +147,13 @@ def list_remote_cmd(pdk_root, pdk):
             print_remote_list(pdk_root, pdk, console, pdk_versions)
         else:
             print(json.dumps([version.name for version in pdk_versions]), end="")
+    except requests.exceptions.HTTPError as e:
+        if sys.stdout.isatty():
+            console = Console()
+            console.print(f"[red]Encountered an error when polling version list: {e}")
+        else:
+            print(f"Failed to get version list: {e}", file=sys.stderr)
+        sys.exit(-1)
     except requests.exceptions.ConnectionError:
         if sys.stdout.isatty():
             console = Console()
@@ -153,6 +166,7 @@ def list_remote_cmd(pdk_root, pdk):
 
 
 @click.command("path")
+@opt_token
 @opt_pdk_root
 @click.argument("version", required=False)
 def path_cmd(pdk_root, pdk, version):
@@ -162,6 +176,7 @@ def path_cmd(pdk_root, pdk, version):
 
 
 @click.command("enable")
+@opt_token
 @opt_pdk_root
 @click.option(
     "-f",
@@ -212,6 +227,7 @@ def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version, include_librarie
 
 
 @click.command("enable_or_build", hidden=True)
+@opt_token
 @opt_pdk_root
 @opt_push
 @opt_build
@@ -231,7 +247,6 @@ def enable_or_build_cmd(
     pdk,
     owner,
     repository,
-    token,
     pre,
     clear_build_artifacts,
     tool_metadata_file_path,
@@ -275,7 +290,6 @@ def enable_or_build_cmd(
             push_kwargs={
                 "owner": owner,
                 "repository": repository,
-                "token": token,
                 "pre": pre,
                 "push_libraries": push_libraries,
             },

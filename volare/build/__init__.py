@@ -29,6 +29,7 @@ from ..github import (
     get_open_pdks_commit_date,
     VOLARE_REPO_NAME,
     VOLARE_REPO_OWNER,
+    credentials,
 )
 from ..common import (
     mkdirp,
@@ -40,6 +41,7 @@ from ..click_common import (
     opt_push,
     opt_build,
     opt_pdk_root,
+    opt_token,
 )
 from ..families import Family
 
@@ -80,6 +82,7 @@ def build(
 
 
 @click.command("build")
+@opt_token
 @opt_pdk_root
 @opt_build
 @click.option(
@@ -138,10 +141,12 @@ def push(
     version,
     owner=VOLARE_REPO_OWNER,
     repository=VOLARE_REPO_NAME,
-    token=os.getenv("GITHUB_TOKEN"),
     pre=False,
     push_libraries=None,
 ):
+    if credentials.token is None:
+        raise TypeError("Attempted to push without set token")
+
     console = Console()
 
     if push_libraries is None:
@@ -209,7 +214,7 @@ def push(
                 "-repository",
                 repository,
                 "-token",
-                token,
+                credentials.token,
                 "-body",
                 body,
                 "-commitish",
@@ -226,10 +231,11 @@ def push(
 
 
 @click.command("push", hidden=True)
+@opt_token
 @opt_pdk_root
 @opt_push
 @click.argument("version")
-def push_cmd(owner, repository, token, pre, pdk_root, pdk, version, push_libraries):
+def push_cmd(owner, repository, pre, pdk_root, pdk, version, push_libraries):
     """
     For maintainers: Package and release a build to the public.
 
@@ -237,4 +243,4 @@ def push_cmd(owner, repository, token, pre, pdk_root, pdk, version, push_librari
 
     Parameters: <version> (required)
     """
-    push(pdk_root, pdk, version, owner, repository, token, pre, push_libraries)
+    push(pdk_root, pdk, version, owner, repository, pre, push_libraries)
