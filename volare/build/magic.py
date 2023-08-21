@@ -17,7 +17,7 @@ import tarfile
 import tempfile
 import platform
 import subprocess
-from typing import Callable, TypeVar
+from typing import Callable, Optional, TypeVar
 
 import requests
 from rich.console import Console
@@ -28,7 +28,7 @@ T = TypeVar("T")
 
 
 def with_magic(
-    magic_tag: str,
+    magic_tag: Optional[str],
     callable: Callable[[str], T],
     build_magic: bool = False,
 ) -> T:
@@ -38,11 +38,13 @@ def with_magic(
             return callable(magic_bin)
         else:
             raise ValueError("Magic not found in PATH.")
-    else:
-        if platform.system() != "Linux":
-            raise RuntimeError(
-                "Building magic is not supported on non-Linux platforms."
-            )
+
+    if platform.system() != "Linux":
+        raise RuntimeError("Building magic is not supported on non-Linux platforms.")
+
+    if magic_tag is None:
+        raise TypeError("magic_tag must not be None if build_magic is set to True")
+
     with tempfile.TemporaryDirectory() as d:
         magic_dir = os.path.join(d, "src")
         magic_tgz = os.path.join(d, "magic_src.tgz")
@@ -69,6 +71,9 @@ def with_magic(
                 components = components[1:]
                 final_path = os.path.join(magic_dir, os.path.sep.join(components))
                 io = tf.extractfile(file)
+                if io is None:
+                    raise RuntimeError("Failed to extract magic repo")
+
                 final_dir = os.path.dirname(final_path)
                 mkdirp(final_dir)
                 with open(final_path, "wb") as f:
@@ -100,7 +105,7 @@ def with_magic(
                 raise RuntimeError("Failed to build Magic.")
 
             console.log("Done building Magic.")
-        except subprocess.SubprocessError as e:
+        except subprocess.CalledProcessError as e:
             console.log(e.stdout)
 
         return callable(magic_bin)

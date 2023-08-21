@@ -6,4 +6,6 @@ exclude =
     build/,
     pdk/
     venv/,
-    volare/__init__.py
+    !volare/build
+per-file-ignores =
+    */__init__.py:F401

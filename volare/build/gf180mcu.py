@@ -27,13 +27,13 @@ from rich.progress import Progress
 from .magic import with_magic
 from .common import RepoMetadata
 from .git_multi_clone import GitMultiClone
+from ..families import Family
+from ..github import OPDKS_REPO_HTTPS
 from ..common import (
     get_version_dir,
     get_volare_dir,
     mkdirp,
-    OPDKS_REPO_HTTPS,
 )
-from ..families import Family
 
 repo_metadata = {
     "open_pdks": RepoMetadata(
@@ -252,10 +252,13 @@ def build(
     using_repos: Optional[Dict[str, str]] = None,
     build_magic: bool = False,
 ):
+    included_libraries: List[str] = []
     if include_libraries is None:
-        include_libraries = Family.by_name["gf180mcu"].default_includes.copy()
-    if "all" in include_libraries:
-        include_libraries = Family.by_name["gf180mcu"].all_libraries.copy()
+        included_libraries = Family.by_name["gf180mcu"].default_includes.copy()
+    elif "all" in include_libraries:
+        included_libraries = Family.by_name["gf180mcu"].all_libraries.copy()
+    else:
+        included_libraries = include_libraries
 
     if using_repos is None:
         using_repos = {}
@@ -273,11 +276,12 @@ def build(
     open_pdks_path, _, magic_tag = get_open_pdks(
         version, build_directory, jobs, using_repos.get("open_pdks")
     )
+
     with_magic(
         magic_tag,
         lambda magic_bin: build_variants(
             magic_bin,
-            list(include_libraries),
+            list(included_libraries),
             build_directory,
             open_pdks_path,
             log_dir,

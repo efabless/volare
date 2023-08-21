@@ -28,14 +28,13 @@ from rich.progress import Progress
 from .magic import with_magic
 from .common import RepoMetadata
 from .git_multi_clone import GitMultiClone
+from ..families import Family
+from ..github import OPDKS_REPO_HTTPS
 from ..common import (
     get_version_dir,
     get_volare_dir,
     mkdirp,
-    OPDKS_REPO_HTTPS,
 )
-from ..families import Family
-
 
 repo_metadata = {
     "open_pdks": RepoMetadata(
