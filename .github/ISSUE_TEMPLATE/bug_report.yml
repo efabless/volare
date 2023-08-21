@@ -1,0 +1,36 @@
+name: Bug Report
+description: If Volare is not behaving as expected, please file a report here.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please note that this bug report is for issues with Volare itself, i.e.,
+        not for issues with using the PDK.
+
+        Basically, if there are files, SCLs or similar missing, that's a Volare
+        issue. If the files have bad values, that is not a Volare issue.
+
+        If you're having trouble using the PDK itself, kindly direct your issues
+        to https://github.com/rtimothyedwards/open_pdks.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What went wrong? Be clear and concise.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you *want* to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: shell-script
+    validations:
+      required: true
