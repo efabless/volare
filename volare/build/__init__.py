@@ -25,19 +25,23 @@ import zstandard as zstd
 from rich.console import Console
 from rich.progress import Progress
 
-from ..common import (
-    mkdirp,
-    check_version,
-    get_version_dir,
+from ..github import (
+    get_open_pdks_commit_date,
     VOLARE_REPO_NAME,
     VOLARE_REPO_OWNER,
-    get_date_of,
+    credentials,
+)
+from ..common import (
+    mkdirp,
+    resolve_version,
+    get_version_dir,
     date_to_iso8601,
 )
 from ..click_common import (
     opt_push,
     opt_build,
     opt_pdk_root,
+    opt_token,
 )
 from ..families import Family
 
@@ -78,6 +82,7 @@ def build(
 
 
 @click.command("build")
+@opt_token
 @opt_pdk_root
 @opt_build
 @click.option(
@@ -111,7 +116,13 @@ def build_cmd(
     if include_libraries == ():
         include_libraries = None
 
-    version = check_version(version, tool_metadata_file_path, Console())
+    console = Console()
+    try:
+        version = resolve_version(version, tool_metadata_file_path)
+    except Exception as e:
+        console.print(f"Could not determine open_pdks version: {e}")
+        exit(-1)
+
     build(
         pdk_root=pdk_root,
         pdk=pdk,
@@ -130,10 +141,12 @@ def push(
     version,
     owner=VOLARE_REPO_OWNER,
     repository=VOLARE_REPO_NAME,
-    token=os.getenv("GITHUB_TOKEN"),
     pre=False,
     push_libraries=None,
 ):
+    if credentials.token is None:
+        raise TypeError("Attempted to push without set token")
+
     console = Console()
 
     if push_libraries is None:
@@ -188,7 +201,7 @@ def push(
     console.log("Starting upload…")
 
     body = f"{pdk} variants built using volare"
-    date = get_date_of(version)
+    date = get_open_pdks_commit_date(version)
     if date is not None:
         body = f"{pdk} variants built using open_pdks {version} (released on {date_to_iso8601(date)})"
 
@@ -201,7 +214,7 @@ def push(
                 "-repository",
                 repository,
                 "-token",
-                token,
+                credentials.token,
                 "-body",
                 body,
                 "-commitish",
@@ -218,10 +231,11 @@ def push(
 
 
 @click.command("push", hidden=True)
+@opt_token
 @opt_pdk_root
 @opt_push
 @click.argument("version")
-def push_cmd(owner, repository, token, pre, pdk_root, pdk, version, push_libraries):
+def push_cmd(owner, repository, pre, pdk_root, pdk, version, push_libraries):
     """
     For maintainers: Package and release a build to the public.
 
@@ -229,4 +243,4 @@ def push_cmd(owner, repository, token, pre, pdk_root, pdk, version, push_librari
 
     Parameters: <version> (required)
     """
-    push(pdk_root, pdk, version, owner, repository, token, pre, push_libraries)
+    push(pdk_root, pdk, version, owner, repository, pre, push_libraries)

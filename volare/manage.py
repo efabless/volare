@@ -28,10 +28,8 @@ from rich.console import Console
 from .build.git_multi_clone import mkdirp
 from .common import (
     Version,
-    get_release_links,
     get_versions_dir,
     get_volare_dir,
-    get_installed_list,
 )
 from .build import build, push
 from .families import Family
@@ -66,7 +64,7 @@ def print_installed_list(
         )
 
     versions_dir = get_versions_dir(pdk_root, pdk)
-    tree = rich.tree.Tree(f"{versions_dir}")
+    tree = rich.tree.Tree(f"In {versions_dir}:")
     for installed in versions:
         day: Optional[str] = None
         if installed.commit_date is not None:
@@ -84,7 +82,7 @@ def print_installed_list(
 def print_remote_list(
     pdk_root: str, pdk: str, console: Console, pdk_list: List[Version]
 ):
-    installed_list = get_installed_list(pdk_root, pdk)
+    installed_list = Version.get_all_installed(pdk_root, pdk)
 
     tree = rich.tree.Tree(f"Pre-built {pdk} PDK versions")
     for remote_version in pdk_list:
@@ -105,7 +103,7 @@ def print_remote_list(
     console.print(tree)
 
 
-def enable(
+def get(
     pdk_root: str,
     pdk: str,
     version: str,
@@ -119,9 +117,6 @@ def enable(
     console = output
     if not isinstance(console, Console):
         console = Console(file=console)
-    current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
-    current_file_dir = os.path.dirname(current_file)
-    mkdirp(current_file_dir)
 
     version_object = Version(version, pdk)
 
@@ -133,13 +128,10 @@ def enable(
 
     variants = pdk_family.variants
 
-    version_paths = [os.path.join(version_directory, variant) for variant in variants]
-    final_paths = [os.path.join(pdk_root, variant) for variant in variants]
-
     if not os.path.exists(version_directory):
         tarball_paths = []
         try:
-            release_link_list = get_release_links(version, pdk, include_libraries)
+            release_link_list = version_object.get_release_links(include_libraries)
             tarball_directory = tempfile.TemporaryDirectory(suffix=".volare")
             for name, link in release_link_list:
                 tarball_path = os.path.join(tarball_directory.name, name)
@@ -218,6 +210,49 @@ def enable(
                 with open(variant_sources_file, "w") as f:
                     print(f"open_pdks {version}", file=f)
 
+
+def enable(
+    pdk_root: str,
+    pdk: str,
+    version: str,
+    build_if_not_found=False,
+    also_push=False,
+    build_kwargs: dict = {},
+    push_kwargs: dict = {},
+    include_libraries: Optional[List[str]] = None,
+    output: Union[Console, io.TextIOWrapper] = Console(),
+):
+    console = output
+    if not isinstance(console, Console):
+        console = Console(file=console)
+
+    version_object = Version(version, pdk)
+    version_directory = version_object.get_dir(pdk_root)
+
+    pdk_family = Family.by_name.get(pdk)
+    if pdk_family is None:
+        raise ValueError(f"Unsupported PDK family '{pdk}'.")
+
+    variants = pdk_family.variants
+    version_paths = [os.path.join(version_directory, variant) for variant in variants]
+    final_paths = [os.path.join(pdk_root, variant) for variant in variants]
+
+    get(
+        pdk_root,
+        pdk,
+        version,
+        build_if_not_found,
+        also_push,
+        build_kwargs,
+        push_kwargs,
+        include_libraries,
+        output=output,
+    )
+
+    current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
+    current_file_dir = os.path.dirname(current_file)
+    mkdirp(current_file_dir)
+
     with console.status(f"Enabling version {version}…"):
         for path in final_paths:
             if os.path.exists(path):
@@ -236,3 +271,14 @@ def enable(
             f.write(version)
 
     console.print(f"Version {version} enabled for the {pdk} PDK.")
+
+
+def root_for(
+    pdk_root: str,
+    pdk: str,
+    version: str,
+) -> str:
+    """
+    Deprecated: use ``Version().get_dir()``
+    """
+    return Version(version, pdk).get_dir(pdk_root)

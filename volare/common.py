@@ -13,19 +13,16 @@
 # limitations under the License.
 import os
 import re
-import json
 import shutil
 import pathlib
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Tuple, Union
 
-import requests
-from rich.console import Console
-
+from . import github
 from .families import Family
 
-# Datetime Helpers
+# -- Assorted Helper Functions
 ISO8601_FMT = "%Y-%m-%dT%H:%M:%SZ"
 
 
@@ -37,35 +34,15 @@ def date_from_iso8601(string: str) -> datetime:
     return datetime.strptime(string, ISO8601_FMT)
 
 
-# ---
-
-VOLARE_REPO_OWNER = os.getenv("VOLARE_REPO_OWNER") or "efabless"
-VOLARE_REPO_NAME = os.getenv("VOLARE_REPO_NAME") or "volare"
-VOLARE_REPO_ID = f"{VOLARE_REPO_OWNER}/{VOLARE_REPO_NAME}"
-VOLARE_REPO_HTTPS = f"https://github.com/{VOLARE_REPO_ID}"
-VOLARE_REPO_API = f"https://api.github.com/repos/{VOLARE_REPO_ID}"
-VOLARE_DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".volare")
-
-
-OPDKS_REPO_OWNER = os.getenv("OPDKS_REPO_OWNER") or "RTimothyEdwards"
-OPDKS_REPO_NAME = os.getenv("OPDKS_REPO_NAME") or "open_pdks"
-OPDKS_REPO_ID = f"{OPDKS_REPO_OWNER}/{OPDKS_REPO_NAME}"
-OPDKS_REPO_HTTPS = f"https://github.com/{OPDKS_REPO_ID}"
-OPDKS_REPO_API = f"https://api.github.com/repos/{OPDKS_REPO_ID}"
-
-# --
-VOLARE_RESOLVED_HOME = os.getenv("PDK_ROOT") or VOLARE_DEFAULT_HOME
-
-
 def mkdirp(path):
     return pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
 
-class RepoMetadata(object):
-    def __init__(self, repo, default_commit, default_branch="main"):
-        self.repo = repo
-        self.default_commit = default_commit
-        self.default_branch = default_branch
+# -- API Variables
+
+# -- PDK Root Management
+VOLARE_DEFAULT_HOME = os.path.join(os.path.expanduser("~"), ".volare")
+VOLARE_RESOLVED_HOME = os.getenv("PDK_ROOT") or VOLARE_DEFAULT_HOME
 
 
 def _get_current_version(pdk_root: str, pdk: str) -> Optional[str]:
@@ -79,6 +56,18 @@ def _get_current_version(pdk_root: str, pdk: str) -> Optional[str]:
         pass
 
     return version
+
+
+def get_volare_home(pdk_root: Optional[str] = None) -> str:
+    return pdk_root or VOLARE_RESOLVED_HOME
+
+
+def get_volare_dir(pdk_root: str, pdk: str) -> str:
+    return os.path.join(pdk_root, "volare", pdk)
+
+
+def get_versions_dir(pdk_root: str, pdk: str) -> str:
+    return os.path.join(get_volare_dir(pdk_root, pdk), "versions")
 
 
 @dataclass
@@ -103,7 +92,7 @@ class Version(object):
         return self.name == _get_current_version(pdk_root, self.pdk)
 
     def get_dir(self, pdk_root: str) -> str:
-        return get_version_dir(pdk_root, self.pdk, self.name)
+        return os.path.join(get_versions_dir(pdk_root, self.pdk), self.name)
 
     def unset_current(self, pdk_root: str):
         if not self.is_installed(pdk_root):
@@ -152,11 +141,7 @@ class Version(object):
 
     @classmethod
     def _from_github(Self) -> Dict[str, List["Version"]]:
-        response_str = requests.get(
-            f"{VOLARE_REPO_API}/releases", params={"per_page": 100}
-        ).content.decode("utf8")
-
-        releases = json.loads(response_str)
+        releases = github.get_releases()
 
         rvs_by_pdk: Dict[str, List["Version"]] = {}
 
@@ -192,11 +177,48 @@ class Version(object):
 
         return rvs_by_pdk
 
+    def get_release_links(
+        self, scl_filter: Optional[List[str]] = None
+    ) -> List[Tuple[str, str]]:
+        default_filter = False
+        if scl_filter is None:
+            default_filter = True
+            scl_filter = Family.by_name[self.pdk].default_includes
 
-def check_version(
+        release = github.get_release_links(f"{self.pdk}-{self.name}")
+
+        assets = release["assets"]
+        zst_files = []
+        xz_file = None
+        for asset in assets:
+            if default_filter and asset["name"] == "default.tar.xz":
+                xz_file = (asset["name"], asset["browser_download_url"])
+            elif asset["name"].endswith(".tar.zst"):
+                asset_scl = asset["name"][:-8]
+                if (
+                    asset_scl == "common"
+                    or "all" in scl_filter
+                    or asset_scl in scl_filter
+                ):
+                    zst_files.append((asset["name"], asset["browser_download_url"]))
+
+        if len(zst_files):
+            return zst_files
+        if xz_file is not None:
+            return [xz_file]
+        if scl_filter is not None:
+            raise ValueError(
+                f"No files found for standard cell libraries: {scl_filter}."
+            )
+
+        raise Exception(
+            f"The release for {self.pdk}-{self.name} is malformed. Please file a bug report."
+        )
+
+
+def resolve_version(
     version: Optional[str],
     tool_metadata_file_path: Optional[str],
-    console: Optional[Console] = None,
 ) -> str:
     """
     Takes an optional version and tool_metadata_file_path.
@@ -216,12 +238,6 @@ def check_version(
     if version is not None:
         return version
 
-    def pr(*args):
-        if console is not None:
-            console.log(*args)
-        else:
-            print(*args)
-
     import yaml
 
     if tool_metadata_file_path is None:
@@ -231,105 +247,37 @@ def check_version(
                 ".", "dependencies", "tool_metadata.yml"
             )
             if not os.path.isfile(tool_metadata_file_path):
-                pr(
+                raise FileNotFoundError(
                     "Any of ./tool_metadata.yml or ./dependencies/tool_metadata.yml not found. You'll need to specify the file path or the commits explicitly."
                 )
-                exit(-1)
 
     tool_metadata = yaml.safe_load(open(tool_metadata_file_path).read())
 
     open_pdks_list = [tool for tool in tool_metadata if tool["name"] == "open_pdks"]
 
     if len(open_pdks_list) < 1:
-        pr("No entry for open_pdks found in tool_metadata.yml")
-        exit(-1)
+        raise ValueError("No entry for open_pdks found in tool_metadata.yml")
 
     version = open_pdks_list[0]["commit"]
-
-    pr(f"Found version {version} in {tool_metadata_file_path}.")
 
     return version
 
 
-def get_volare_home(pdk_root: Optional[str] = None) -> str:
-    return pdk_root or VOLARE_RESOLVED_HOME
-
-
-def get_volare_dir(pdk_root: str, pdk: str) -> str:
-    return os.path.join(pdk_root, "volare", pdk)
-
-
-def get_versions_dir(pdk_root: str, pdk: str) -> str:
-    return os.path.join(get_volare_dir(pdk_root, pdk), "versions")
-
-
-def get_version_dir(pdk_root: str, pdk: str, version: Union[str, Version]) -> str:
-    return os.path.join(get_versions_dir(pdk_root, pdk), str(version))
-
-
-def get_link_of(version: str, pdk: str, classic: bool = False) -> str:
-    if classic:
-        return f"{VOLARE_REPO_HTTPS}/releases/download/{pdk}-{version}/default.tar.xz"
-    else:
-        return f"{VOLARE_REPO_HTTPS}/releases/download/{pdk}-{version}/common.tar.zst"
-
-
-def get_release_links(
-    version: str,
-    pdk: str,
-    scl_filter: Optional[List[str]] = None,
-) -> List[Tuple[str, str]]:
-    default_filter = False
-    if scl_filter is None:
-        default_filter = True
-        scl_filter = Family.by_name[pdk].default_includes
-
-    release_api_link = f"{VOLARE_REPO_API}/releases/tags/{pdk}-{version}"
-    releases = requests.get(release_api_link, json=True)
-    releases.raise_for_status()
-
-    assets = releases.json()["assets"]
-    zst_files = []
-    xz_file = None
-    for asset in assets:
-        if default_filter and asset["name"] == "default.tar.xz":
-            xz_file = (asset["name"], asset["browser_download_url"])
-        elif asset["name"].endswith(".tar.zst"):
-            asset_scl = asset["name"][:-8]
-            if asset_scl == "common" or "all" in scl_filter or asset_scl in scl_filter:
-                zst_files.append((asset["name"], asset["browser_download_url"]))
-
-    if len(zst_files):
-        return zst_files
-    if xz_file is not None:
-        return [xz_file]
-    if scl_filter is not None:
-        raise ValueError(f"No files found for standard cell libraries: {scl_filter}.")
-
-    raise Exception(
-        f"The release for {pdk}-{version} is malformed. Please file a bug report."
-    )
-
-
-def get_date_of(opdks_commit: str) -> Optional[datetime]:
-    try:
-        request = requests.get(f"{OPDKS_REPO_API}/commits/{opdks_commit}")
-        request.raise_for_status()
-    except requests.exceptions.ConnectionError:
-        return None
-    except requests.exceptions.HTTPError:
-        return None
-
-    response_str = request.content.decode("utf8")
-    response = json.loads(response_str)
-    date = response["commit"]["author"]["date"]
-    commit_date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
-    return commit_date
-
-
-def get_installed_list(pdk_root: str, pdk: str) -> List[Version]:
-    return Version.get_all_installed(pdk_root, pdk)
+# -- The Deprecation Zone
 
 
 def get_current_version(pdk_root: str, pdk: str) -> Optional[str]:
+    # DEPRECATED: Use `Version.get_current()`
     return _get_current_version(pdk_root, pdk)
+
+
+def get_installed_list(pdk_root: str, pdk: str) -> list:
+    # DEPRECATED: Use `Version.get_all_installed()`
+    return Version.get_all_installed(pdk_root, pdk)
+
+
+def get_version_dir(pdk_root: str, pdk: str, version: Union[str, Version]) -> str:
+    # DEPRECATED: Use `Version().get_dir()`
+    if not isinstance(version, Version):
+        version = Version(version, pdk)
+    return version.get_dir(pdk_root)

@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from .manage import VersionNotFound, enable, get, root_for
-from .common import get_volare_home, get_current_version, get_installed_list, Version
-from .build import build
 
-from .__version__ import __version__
+
+class RepoMetadata(object):
+    def __init__(self, repo, default_commit, default_branch="main"):
+        self.repo = repo
+        self.default_commit = default_commit
+        self.default_branch = default_branch

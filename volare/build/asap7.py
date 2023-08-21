@@ -20,9 +20,9 @@ from concurrent.futures import ThreadPoolExecutor
 from rich.console import Console
 from rich.progress import Progress
 
+from .common import RepoMetadata
 from .git_multi_clone import GitMultiClone
 from ..common import (
-    RepoMetadata,
     get_version_dir,
     get_volare_dir,
     mkdirp,
