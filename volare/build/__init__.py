@@ -32,6 +32,7 @@ from ..github import (
     credentials,
 )
 from ..common import (
+    Version,
     mkdirp,
     resolve_version,
     get_version_dir,
@@ -145,19 +146,18 @@ def push(
     push_libraries=None,
 ):
     if credentials.token is None:
-        raise TypeError("Attempted to push without set token")
+        raise TypeError("No GitHub token was provided.")
 
     console = Console()
 
-    if push_libraries is None:
-        push_libraries = Family.by_name["PDK"].all_libraries
-
+    if push_libraries is None or len(push_libraries) == 0:
+        push_libraries = Family.by_name[pdk].all_libraries
     library_list = set(push_libraries)
 
-    version_directory = get_version_dir(pdk_root, pdk, version)
+    version_object = Version(version, pdk)
+    version_directory = version_object.get_dir(pdk_root)
     if not os.path.isdir(version_directory):
-        console.print("[red]Version not found.")
-        exit(-1)
+        raise FileNotFoundError(f"Version {version} not found.")
 
     tempdir = tempfile.gettempdir()
     tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}", version)
@@ -243,4 +243,9 @@ def push_cmd(owner, repository, pre, pdk_root, pdk, version, push_libraries):
 
     Parameters: <version> (required)
     """
-    push(pdk_root, pdk, version, owner, repository, pre, push_libraries)
+    console = Console()
+    try:
+        push(pdk_root, pdk, version, owner, repository, pre, push_libraries)
+    except Exception as e:
+        console.print(f"[red]Failed to push version: {e}")
+        exit(-1)
