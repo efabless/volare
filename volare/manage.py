@@ -192,7 +192,9 @@ def get(
                 else:
                     raise RuntimeError(f"Version {version} not found remotely.")
             else:
-                raise RuntimeError(f"Failed to obtain {version} remotely: {e}.")
+                raise RuntimeError(
+                    f"Failed to obtain {version} remotely: {e.response}."
+                )
         except KeyboardInterrupt as e:
             console.print("Interrupted.")
             shutil.rmtree(version_directory, ignore_errors=True)

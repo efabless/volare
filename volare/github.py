@@ -19,6 +19,8 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Any, List, Mapping, Optional
 
+from .__version__ import __version__
+
 
 VOLARE_REPO_OWNER = os.getenv("VOLARE_REPO_OWNER") or "efabless"
 VOLARE_REPO_NAME = os.getenv("VOLARE_REPO_NAME") or "volare"
@@ -60,7 +62,10 @@ class GitHubCredentials:
     def get_session(self) -> requests.Session:
         session = requests.Session()
         if self.token is not None:
-            session.headers = {"Authorization": f"token {self.token}"}
+            session.headers = {
+                "Authorization": f"token {self.token}",
+                "User-Agent": f"volare/{__version__}",
+            }
         return session
 
 
