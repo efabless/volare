@@ -129,6 +129,7 @@ def get(
     variants = pdk_family.variants
 
     if not os.path.exists(version_directory):
+        console.print(f"Version {version} not found locally, attempting to download…")
         tarball_paths = []
         try:
             release_link_list = version_object.get_release_links(include_libraries)
@@ -176,19 +177,22 @@ def get(
                             with open(final_path, "wb") as f:
                                 f.write(io.read())
         except requests.exceptions.HTTPError as e:
-            if build_if_not_found:
-                console.print(f"Version {version} not found, attempting to build…")
-                build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
-                if also_push:
-                    if push_kwargs["push_libraries"] is None:
-                        push_kwargs["push_libraries"] = Family.by_name[
-                            pdk
-                        ].default_includes.copy()
-                    push(pdk_root=pdk_root, pdk=pdk, version=version, **push_kwargs)
+            if e.response.status_code == 404:
+                if build_if_not_found:
+                    console.print(
+                        f"Version {version} not found remotely, attempting to build…"
+                    )
+                    build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
+                    if also_push:
+                        if push_kwargs["push_libraries"] is None:
+                            push_kwargs["push_libraries"] = Family.by_name[
+                                pdk
+                            ].default_includes.copy()
+                        push(pdk_root=pdk_root, pdk=pdk, version=version, **push_kwargs)
+                else:
+                    raise RuntimeError(f"Version {version} not found remotely.")
             else:
-                raise FileNotFoundError(
-                    f"Version {version} not found either locally or remotely: {e}."
-                )
+                raise RuntimeError(f"Failed to obtain {version} remotely: {e}.")
         except KeyboardInterrupt as e:
             console.print("Interrupted.")
             shutil.rmtree(version_directory, ignore_errors=True)

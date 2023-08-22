@@ -146,7 +146,8 @@ def list_remote_cmd(pdk_root, pdk):
             console = Console()
             print_remote_list(pdk_root, pdk, console, pdk_versions)
         else:
-            print(json.dumps([version.name for version in pdk_versions]), end="")
+            for version in pdk_versions:
+                print(version.name)
     except requests.exceptions.HTTPError as e:
         if sys.stdout.isatty():
             console = Console()
