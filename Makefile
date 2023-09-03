@@ -11,7 +11,7 @@ dist: venv/manifest.txt
 lint: venv/manifest.txt
 	./venv/bin/black --check .
 	./venv/bin/flake8 .
-	./venv/bin/mypy .
+	./venv/bin/mypy --check-untyped-defs .
 
 venv: venv/manifest.txt
 venv/manifest.txt: $(REQ_FILES)

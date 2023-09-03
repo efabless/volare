@@ -64,6 +64,7 @@ class Repository(object):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+        assert process.stderr is not None
 
         ro_rx = re.compile(r"Receiving objects:\s*(\d+)%")
 
@@ -110,6 +111,7 @@ class Repository(object):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+        assert process.stderr is not None
         callback(0, f"Updating {self.name}…")
 
         ro_rx = re.compile(r"Receiving objects:\s*(\d+)%")

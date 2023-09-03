@@ -18,7 +18,7 @@ import tarfile
 import tempfile
 import importlib
 import subprocess
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import click
 import zstandard as zstd
@@ -166,7 +166,7 @@ def push(
     final_tarballs = []
 
     with Progress() as progress:
-        collections = {"common": []}
+        collections: Dict[str, List[str]] = {"common": []}
         path_it = pathlib.Path(version_directory).glob("**/*")
         for path in path_it:
             if not path.is_file():
