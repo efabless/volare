@@ -89,7 +89,7 @@ def prune_cmd(pdk_root, pdk):
         if version.is_current(pdk_root):
             continue
         try:
-            version.uninstall()
+            version.uninstall(pdk_root)
             print(f"Deleted {version}.")
         except Exception as e:
             print(f"Failed to delete {version}: {e}", file=sys.stderr)
