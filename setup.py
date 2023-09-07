@@ -5,12 +5,12 @@ from setuptools import setup, find_packages
 
 module_name = "volare"
 
-__dir__ = os.path.dirname(__file__)
+__dir__ = os.path.abspath(os.path.dirname(__file__))
 version = subprocess.check_output(
     [
         "python3",
         os.path.join(
-            os.path.abspath(__dir__),
+            __dir__,
             module_name,
             "__version__.py",
         ),
@@ -18,7 +18,9 @@ version = subprocess.check_output(
     encoding="utf8",
 )
 
-requirements = open("requirements.txt").read().strip().split("\n")
+requirements = (
+    open(os.path.join(__dir__, "requirements.txt")).read().strip().split("\n")
+)
 
 setup(
     name=module_name,
