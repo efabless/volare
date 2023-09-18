@@ -101,7 +101,10 @@ class Version(object):
             return
 
         for variant in Family.by_name[self.pdk].variants:
-            os.unlink(os.path.join(pdk_root, variant))
+            try:
+                os.unlink(os.path.join(pdk_root, variant))
+            except FileNotFoundError:
+                pass
 
         current_file = os.path.join(get_volare_dir(pdk_root, self.pdk), "current")
         os.unlink(current_file)

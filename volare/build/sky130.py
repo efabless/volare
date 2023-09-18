@@ -388,7 +388,8 @@ def install_sky130(build_directory, pdk_root, version):
         for variant in sky130_family.variants:
             variant_build_path = os.path.join(build_directory, variant)
             variant_install_path = os.path.join(version_directory, variant)
-            shutil.copytree(variant_build_path, variant_install_path)
+            if os.path.isdir(variant_build_path):
+                shutil.copytree(variant_build_path, variant_install_path)
 
     console.log("Done.")
 
