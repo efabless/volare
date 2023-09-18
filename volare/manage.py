@@ -211,6 +211,8 @@ def get(
 
         for variant in variants:
             variant_install_path = os.path.join(version_directory, variant)
+            if not os.path.isdir(variant_install_path):
+                continue
             variant_sources_file = os.path.join(variant_install_path, "SOURCES")
             if not os.path.isfile(variant_sources_file):
                 with open(variant_sources_file, "w") as f:
@@ -271,7 +273,8 @@ def enable(
 
         for vpath, fpath in zip(version_paths, final_paths):
             src = os.path.relpath(vpath, pdk_root)
-            os.symlink(src=src, dst=fpath)
+            if os.path.isdir(vpath):
+                os.symlink(src=src, dst=fpath)
 
         with open(current_file, "w") as f:
             f.write(version)

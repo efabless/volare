@@ -28,7 +28,7 @@ setup(
     package_data={"volare": ["py.typed"]},
     version=version,
     description="An open_pdks PDK builder/version manager",
-    long_description=open("Readme.md").read(),
+    long_description=open(os.path.join(__dir__, "Readme.md")).read(),
     long_description_content_type="text/markdown",
     author="Efabless Corporation",
     author_email="donn@efabless.com",
