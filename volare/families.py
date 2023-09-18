@@ -60,7 +60,7 @@ Family.by_name["sky130"] = Family(
 )
 Family.by_name["gf180mcu"] = Family(
     "gf180mcu",
-    ["gf180mcuA", "gf180mcuB", "gf180mcuC"],
+    ["gf180mcuA", "gf180mcuB", "gf180mcuC", "gf180mcuD"],
     [
         "gf180mcu_fd_io",
         "gf180mcu_fd_pr",
