@@ -1,3 +1,4 @@
+PYTHON3 ?= python3
 REQ_FILES = ./requirements_dev.txt ./requirements.txt
 REQ_FILES_PFX = $(addprefix -r ,$(REQ_FILES))
 
@@ -16,7 +17,7 @@ lint: venv/manifest.txt
 venv: venv/manifest.txt
 venv/manifest.txt: $(REQ_FILES)
 	rm -rf venv
-	python3 -m venv ./venv
+	$(PYTHON3) -m venv ./venv
 	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade pip
 	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade wheel
 	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade $(REQ_FILES_PFX)

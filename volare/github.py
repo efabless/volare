@@ -43,7 +43,11 @@ def _get_gh_token() -> Optional[str]:
     ghcli_file = os.path.join(os.path.expanduser("~/.config/gh/hosts.yml"))
     if os.path.exists(ghcli_file):
         hosts = yaml.safe_load(open(ghcli_file))
-        token = str(hosts["github.com"]["oauth_token"])
+        gh_host = hosts.get("github.com")
+        if gh_host is not None:
+            oauth_token = gh_host.get("oauth_token")
+            if oauth_token is not None:
+                token = str(oauth_token)
 
     # 1. Higher priority: environment GITHUB_TOKEN
     env_token = os.getenv("GITHUB_TOKEN")
