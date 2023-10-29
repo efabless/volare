@@ -177,7 +177,7 @@ def get(
                             with open(final_path, "wb") as f:
                                 f.write(io.read())
         except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
+            if e.response is not None and e.response.status_code == 404:
                 if build_if_not_found:
                     console.print(
                         f"Version {version} not found remotely, attempting to build…"
@@ -192,9 +192,13 @@ def get(
                 else:
                     raise RuntimeError(f"Version {version} not found remotely.")
             else:
-                raise RuntimeError(
-                    f"Failed to obtain {version} remotely: {e.response}."
-                )
+                if e.response is not None:
+                    raise RuntimeError(
+                        f"Failed to obtain {version} remotely: {e.response}."
+                    )
+                else:
+                    raise RuntimeError(f"Failed to request {version} from server: {e}.")
+
         except KeyboardInterrupt as e:
             console.print("Interrupted.")
             shutil.rmtree(version_directory, ignore_errors=True)
