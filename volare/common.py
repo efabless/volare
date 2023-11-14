@@ -17,7 +17,7 @@ import shutil
 import pathlib
 from datetime import datetime
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Tuple, Union
+from typing import Iterable, Optional, List, Dict, Tuple, Union
 
 from . import github
 from .families import Family
@@ -181,28 +181,19 @@ class Version(object):
         return rvs_by_pdk
 
     def get_release_links(
-        self, scl_filter: Optional[List[str]] = None
+        self, scl_filter: Iterable[str], include_common: bool
     ) -> List[Tuple[str, str]]:
-        default_filter = False
-        if scl_filter is None:
-            default_filter = True
-            scl_filter = Family.by_name[self.pdk].default_includes
-
         release = github.get_release_links(f"{self.pdk}-{self.name}")
 
         assets = release["assets"]
         zst_files = []
         xz_file = None
         for asset in assets:
-            if default_filter and asset["name"] == "default.tar.xz":
-                xz_file = (asset["name"], asset["browser_download_url"])
-            elif asset["name"].endswith(".tar.zst"):
+            if asset["name"].endswith(".tar.zst"):
                 asset_scl = asset["name"][:-8]
                 if (
-                    asset_scl == "common"
-                    or "all" in scl_filter
-                    or asset_scl in scl_filter
-                ):
+                    asset_scl == "common" and include_common
+                ) or asset_scl in scl_filter:
                     zst_files.append((asset["name"], asset["browser_download_url"]))
 
         if len(zst_files):

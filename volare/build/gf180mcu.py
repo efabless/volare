@@ -253,13 +253,11 @@ def build(
     using_repos: Optional[Dict[str, str]] = None,
     build_magic: bool = False,
 ):
-    included_libraries: List[str] = []
     if include_libraries is None:
-        included_libraries = Family.by_name["gf180mcu"].default_includes.copy()
-    elif "all" in include_libraries:
-        included_libraries = Family.by_name["gf180mcu"].all_libraries.copy()
-    else:
-        included_libraries = include_libraries
+        include_libraries = Family.by_name["gf180mcu"].default_includes.copy()
+    if "all" in include_libraries:
+        include_libraries = Family.by_name["gf180mcu"].all_libraries.copy()
+    include_libraries = list(include_libraries)
 
     if using_repos is None:
         using_repos = {}
@@ -282,7 +280,7 @@ def build(
         magic_tag,
         lambda magic_bin: build_variants(
             magic_bin,
-            list(included_libraries),
+            include_libraries,
             build_directory,
             open_pdks_path,
             log_dir,
