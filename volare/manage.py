@@ -16,7 +16,7 @@ import os
 import shutil
 import tarfile
 import tempfile
-from typing import Any, Iterable, List, Optional, Union
+from typing import Iterable, List, Optional, Union
 
 import rich
 import httpx

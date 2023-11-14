@@ -187,7 +187,6 @@ class Version(object):
 
         assets = release["assets"]
         zst_files = []
-        xz_file = None
         for asset in assets:
             if asset["name"].endswith(".tar.zst"):
                 asset_scl = asset["name"][:-8]
@@ -198,8 +197,6 @@ class Version(object):
 
         if len(zst_files):
             return zst_files
-        if xz_file is not None:
-            return [xz_file]
         if scl_filter is not None:
             raise ValueError(
                 f"No files found for standard cell libraries: {scl_filter}."
