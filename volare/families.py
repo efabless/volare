@@ -37,7 +37,6 @@ Family.by_name["sky130"] = Family(
     [
         "sky130_fd_io",
         "sky130_fd_pr",
-        "sky130_fd_pr_reram",
         "sky130_fd_sc_hd",
         "sky130_fd_sc_hvl",
         "sky130_ml_xx_hd",
@@ -46,7 +45,6 @@ Family.by_name["sky130"] = Family(
     [
         "sky130_fd_io",
         "sky130_fd_pr",
-        "sky130_fd_pr_reram",
         "sky130_ml_xx_hd",
         "sky130_fd_sc_hd",
         "sky130_fd_sc_hdll",

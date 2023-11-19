@@ -255,7 +255,6 @@ def build_sky130_timing(build_directory, sky130_path, log_dir, jobs=1):
 LIB_FLAG_MAP = {
     "sky130_fd_io": "--enable-io-sky130",
     "sky130_fd_pr": "--enable-primitive-sky130",
-    "sky130_fd_pr_reram": "",
     "sky130_ml_xx_hd": "--enable-alpha-sky130",
     "sky130_fd_sc_hd": "--enable-sc-hd-sky130",
     "sky130_fd_sc_hdll": "--enable-sc-hdll-sky130",
