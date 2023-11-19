@@ -14,7 +14,7 @@
 import os
 import json
 import yaml
-import requests
+import httpx
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Any, List, Mapping, Optional
@@ -63,13 +63,15 @@ def _get_gh_token() -> Optional[str]:
 class GitHubCredentials:
     token: Optional[str] = _get_gh_token()
 
-    def get_session(self) -> requests.Session:
-        session = requests.Session()
+    def get_session(self) -> httpx.Client:
+        session = httpx.Client(follow_redirects=True)
         if self.token is not None:
-            session.headers = {
-                "Authorization": f"token {self.token}",
-                "User-Agent": f"volare/{__version__}",
-            }
+            session.headers = httpx.Headers(
+                {
+                    "Authorization": f"token {self.token}",
+                    "User-Agent": f"volare/{__version__}",
+                }
+            )
         return session
 
 
@@ -80,9 +82,7 @@ def get_open_pdks_commit_date(commit: str) -> Optional[datetime]:
     try:
         request = credentials.get_session().get(f"{OPDKS_REPO_API}/commits/{commit}")
         request.raise_for_status()
-    except requests.exceptions.ConnectionError:
-        return None
-    except requests.exceptions.HTTPError:
+    except httpx.HTTPError:
         return None
 
     response_str = request.content.decode("utf8")
@@ -103,7 +103,7 @@ def get_releases() -> List[Mapping[str, Any]]:
 
 def get_release_links(release: str) -> Mapping[str, Any]:
     release_api_link = f"{VOLARE_REPO_API}/releases/tags/{release}"
-    req = credentials.get_session().get(release_api_link, json=True)
+    req = credentials.get_session().get(release_api_link)
     req.raise_for_status()
 
     return req.json()

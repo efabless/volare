@@ -16,10 +16,10 @@ import os
 import shutil
 import tarfile
 import tempfile
-from typing import Any, List, Optional, Union
+from typing import Iterable, List, Optional, Union
 
 import rich
-import requests
+import httpx
 import rich.tree
 import rich.progress
 import zstandard as zstd
@@ -31,6 +31,7 @@ from .common import (
     get_versions_dir,
     get_volare_dir,
 )
+from .github import credentials
 from .build import build, push
 from .families import Family
 
@@ -58,9 +59,9 @@ def print_installed_list(
                 installed.commit_date = remote_version.commit_date
                 installed.upload_date = remote_version.upload_date
         versions.sort(reverse=True)
-    except requests.exceptions.ConnectionError:
+    except httpx.HTTPError:
         console.print(
-            "[red]You don't appear to be connected to the Internet. Date information may be unavailable."
+            "[red]Failed to connect to GitHub. Date information may be unavailable."
         )
 
     versions_dir = get_versions_dir(pdk_root, pdk)
@@ -111,7 +112,7 @@ def get(
     also_push=False,
     build_kwargs: dict = {},
     push_kwargs: dict = {},
-    include_libraries: Optional[List[str]] = None,
+    include_libraries: Optional[Iterable[str]] = None,
     output: Union[Console, io.TextIOWrapper] = Console(),
 ):
     console = output
@@ -126,42 +127,67 @@ def get(
     if pdk_family is None:
         raise ValueError(f"Unsupported PDK family '{pdk}'.")
 
+    if include_libraries is None:
+        include_libraries = pdk_family.default_includes
+    if "all" in include_libraries:
+        include_libraries = pdk_family.all_libraries
+    include_libraries = list(include_libraries)
+
     variants = pdk_family.variants
 
-    if not os.path.exists(version_directory):
-        console.print(f"Version {version} not found locally, attempting to download…")
+    common_missing = False
+    missing_libraries = set()
+    libs_tech = os.path.join(version_directory, variants[0], "libs.tech")
+    if not os.path.isdir(libs_tech):
+        common_missing = True
+
+    for library in include_libraries:
+        if library not in pdk_family.all_libraries:
+            raise RuntimeError(f"Unknown library {library}.")
+        for variant in variants:
+            lib_path = os.path.join(version_directory, variant, "libs.ref", library)
+            if not os.path.isdir(lib_path):
+                missing_libraries.add(library)
+
+    affected_paths = []
+    if len(missing_libraries) != 0 or common_missing:
+        if common_missing:
+            console.print(
+                f"Version {version} not found locally, attempting to download…"
+            )
+            affected_paths.append(version_directory)
+        else:
+            console.print(f"Libraries {missing_libraries} not found, downloading them…")
+            for variant in variants:
+                affected_paths.append(
+                    os.path.join(version_directory, variant, "libs.ref", library)
+                )
+
         tarball_paths = []
         try:
-            release_link_list = version_object.get_release_links(include_libraries)
+            release_link_list = version_object.get_release_links(
+                missing_libraries,
+                include_common=common_missing,
+            )
             tarball_directory = tempfile.TemporaryDirectory(suffix=".volare")
             for name, link in release_link_list:
                 tarball_path = os.path.join(tarball_directory.name, name)
                 tarball_paths.append(tarball_path)
-                r = requests.get(link, stream=True)
-                with rich.progress.Progress(console=console) as p:
+                with credentials.get_session().stream(
+                    "get", link
+                ) as r, rich.progress.Progress(console=console) as p:
                     task = p.add_task(
                         f"Downloading {name}…",
                         total=int(r.headers["Content-length"]),
                     )
                     r.raise_for_status()
                     with open(tarball_path, "wb") as f:
-                        for chunk in r.iter_content(chunk_size=8192):
+                        for chunk in r.iter_bytes(chunk_size=8192):
                             p.advance(task, advance=len(chunk))
                             f.write(chunk)
 
                 with console.status(f"Unpacking {name}…"):
-                    stream: Any = None
-                    if name.endswith(".tar.zst"):
-                        stream = zstd.open(tarball_path, mode="rb")
-                    else:
-                        try:
-                            import lzma
-
-                            stream = lzma.open(tarball_path, mode="rb")
-                        except ImportError:
-                            raise OSError(
-                                "Your Python installation does not support xz compression. Either reinstall Python or try a newer PDK version."
-                            )
+                    stream = zstd.open(tarball_path, mode="rb")
                     with tarfile.TarFile(fileobj=stream, mode="r") as tf:
                         for file in tf:
                             if file.isdir():
@@ -176,21 +202,20 @@ def get(
                                 )
                             with open(final_path, "wb") as f:
                                 f.write(io.read())
-        except requests.exceptions.HTTPError as e:
+        except httpx.HTTPStatusError as e:
             if e.response is not None and e.response.status_code == 404:
-                if build_if_not_found:
-                    console.print(
-                        f"Version {version} not found remotely, attempting to build…"
-                    )
-                    build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
-                    if also_push:
-                        if push_kwargs["push_libraries"] is None:
-                            push_kwargs["push_libraries"] = Family.by_name[
-                                pdk
-                            ].default_includes.copy()
-                        push(pdk_root=pdk_root, pdk=pdk, version=version, **push_kwargs)
-                else:
+                if not build_if_not_found:
                     raise RuntimeError(f"Version {version} not found remotely.")
+                console.print(
+                    f"Version {version} not found remotely, attempting to build…"
+                )
+                build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
+                if also_push:
+                    if push_kwargs["push_libraries"] is None:
+                        push_kwargs["push_libraries"] = Family.by_name[
+                            pdk
+                        ].default_includes.copy()
+                    push(pdk_root=pdk_root, pdk=pdk, version=version, **push_kwargs)
             else:
                 if e.response is not None:
                     raise RuntimeError(
@@ -198,13 +223,14 @@ def get(
                     )
                 else:
                     raise RuntimeError(f"Failed to request {version} from server: {e}.")
-
         except KeyboardInterrupt as e:
             console.print("Interrupted.")
-            shutil.rmtree(version_directory, ignore_errors=True)
+            for path in affected_paths:
+                shutil.rmtree(path, ignore_errors=True)
             raise e from None
         except Exception as e:
-            shutil.rmtree(version_directory, ignore_errors=True)
+            for path in affected_paths:
+                shutil.rmtree(path, ignore_errors=True)
             raise e from None
         finally:
             for path in tarball_paths:

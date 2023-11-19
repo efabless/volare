@@ -19,7 +19,7 @@ with pkgs; with python3.pkgs; buildPythonPackage rec {
     click
     pyyaml
     rich
-    requests
+    httpx
     pcpp
     zstandard
   ];

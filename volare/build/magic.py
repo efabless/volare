@@ -19,10 +19,10 @@ import platform
 import subprocess
 from typing import Callable, Optional, TypeVar
 
-import requests
 from rich.console import Console
 
 from ..common import mkdirp
+from ..github import credentials
 
 T = TypeVar("T")
 
@@ -53,9 +53,8 @@ def with_magic(
 
         console = Console()
         console.status("Downloading Magic repo…")
-        magic_req = requests.get(
+        magic_req = credentials.get_session().get(
             f"https://github.com/RTimothyEdwards/magic/tarball/{magic_tag}",
-            allow_redirects=True,
         )
         with open(magic_tgz, "wb") as f:
             f.write(magic_req.content)

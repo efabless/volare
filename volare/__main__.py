@@ -13,7 +13,7 @@
 # limitations under the License.
 import sys
 import json
-import requests
+import httpx
 
 import click
 from rich.console import Console
@@ -21,6 +21,7 @@ from rich.console import Console
 from .__version__ import __version__
 from .common import (
     Version,
+    get_volare_home,
     resolve_version,
 )
 from .click_common import (
@@ -148,32 +149,39 @@ def list_remote_cmd(pdk_root, pdk):
         else:
             for version in pdk_versions:
                 print(version.name)
-    except requests.exceptions.HTTPError as e:
+    except httpx.HTTPStatusError as e:
         if sys.stdout.isatty():
             console = Console()
             console.print(f"[red]Encountered an error when polling version list: {e}")
         else:
             print(f"Failed to get version list: {e}", file=sys.stderr)
         sys.exit(-1)
-    except requests.exceptions.ConnectionError:
+    except httpx.NetworkError as e:
         if sys.stdout.isatty():
             console = Console()
             console.print(
                 "[red]You don't appear to be connected to the Internet. ls-remote cannot be used."
             )
         else:
-            print("Failed to connect to remote server", file=sys.stderr)
+            print(f"Failed to connect to remote server: {e}", file=sys.stderr)
         sys.exit(-1)
 
 
 @click.command("path")
-@opt_token
 @opt_pdk_root
 @click.argument("version", required=False)
 def path_cmd(pdk_root, pdk, version):
-    """Prints the path of a specific pdk version installation."""
-    version = Version(version, pdk)
-    print(version.get_dir(pdk_root), end="")
+    """
+    Prints the path of the volare PDK root.
+
+    If a version is provided over the commandline, it prints the path to this
+    version instead.
+    """
+    if version is not None:
+        version = Version(version, pdk)
+        print(version.get_dir(pdk_root), end="")
+    else:
+        print(get_volare_home())
 
 
 @click.command("enable")

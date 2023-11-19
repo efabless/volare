@@ -407,6 +407,7 @@ def build(
         include_libraries = Family.by_name["sky130"].default_includes.copy()
     if "all" in include_libraries:
         include_libraries = Family.by_name["sky130"].all_libraries.copy()
+    include_libraries = list(include_libraries)
 
     if using_repos is None:
         using_repos = {}
