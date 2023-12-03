@@ -129,7 +129,6 @@ LIB_FLAG_MAP = {
 def build_variants(
     magic_bin, include_libraries, build_directory, open_pdks_path, log_dir, jobs=1
 ):
-
     try:
         pdk_root_abs = os.path.abspath(build_directory)
         console = Console()
@@ -253,11 +252,8 @@ def build(
     using_repos: Optional[Dict[str, str]] = None,
     build_magic: bool = False,
 ):
-    if include_libraries is None:
-        include_libraries = Family.by_name["gf180mcu"].default_includes.copy()
-    if "all" in include_libraries:
-        include_libraries = Family.by_name["gf180mcu"].all_libraries.copy()
-    include_libraries = list(include_libraries)
+    family = Family.by_name["gf180mcu"]
+    library_set = family.resolve_libraries(include_libraries)
 
     if using_repos is None:
         using_repos = {}
@@ -280,7 +276,7 @@ def build(
         magic_tag,
         lambda magic_bin: build_variants(
             magic_bin,
-            include_libraries,
+            library_set,
             build_directory,
             open_pdks_path,
             log_dir,

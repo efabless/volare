@@ -35,6 +35,7 @@ from .manage import (
     print_installed_list,
     print_remote_list,
     enable,
+    fetch,
 )
 from .build import (
     build_cmd,
@@ -43,7 +44,6 @@ from .build import (
 
 
 @click.command("output")
-@opt_token
 @opt_pdk_root
 def output_cmd(pdk_root, pdk):
     """Outputs the currently enabled PDK version.
@@ -74,7 +74,6 @@ def output_cmd(pdk_root, pdk):
 
 
 @click.command("prune")
-@opt_token
 @opt_pdk_root
 @click.option(
     "--yes",
@@ -97,7 +96,6 @@ def prune_cmd(pdk_root, pdk):
 
 
 @click.command("rm")
-@opt_token
 @opt_pdk_root
 @click.option(
     "--yes",
@@ -121,14 +119,20 @@ def rm_cmd(pdk_root, pdk, version):
 @click.command("ls")
 @opt_token
 @opt_pdk_root
-def list_cmd(pdk_root, pdk):
+def list_cmd(pdk_root, pdk, session):
     """Lists PDK versions that are locally installed. JSON if not outputting to a tty."""
 
     pdk_versions = Version.get_all_installed(pdk_root, pdk)
 
     if sys.stdout.isatty():
         console = Console()
-        print_installed_list(pdk_root, pdk, console, pdk_versions)
+        print_installed_list(
+            pdk_root,
+            pdk,
+            console=console,
+            installed_list=pdk_versions,
+            session=session,
+        )
     else:
         print(json.dumps([version.name for version in pdk_versions]), end="")
 
@@ -136,11 +140,11 @@ def list_cmd(pdk_root, pdk):
 @click.command("ls-remote")
 @opt_token
 @opt_pdk_root
-def list_remote_cmd(pdk_root, pdk):
+def list_remote_cmd(pdk_root, pdk, session):
     """Lists PDK versions that are remotely available. JSON if not outputting to a tty."""
 
     try:
-        all_versions = Version._from_github()
+        all_versions = Version._from_github(session)
         pdk_versions = all_versions.get(pdk) or []
 
         if sys.stdout.isatty():
@@ -202,7 +206,14 @@ def path_cmd(pdk_root, pdk, version):
     help="Libraries to include. You can use -l multiple times to include multiple libraries. Pass 'all' to include all of them. A default of 'None' uses a default set for the particular PDK.",
 )
 @click.argument("version", required=False)
-def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version, include_libraries):
+def enable_cmd(
+    pdk_root,
+    pdk,
+    tool_metadata_file_path,
+    version,
+    include_libraries,
+    session,
+):
     """
     Activates a given installed PDK version.
 
@@ -224,12 +235,75 @@ def enable_cmd(pdk_root, pdk, tool_metadata_file_path, version, include_librarie
 
     try:
         enable(
+            pdk_root,
+            pdk,
+            version,
+            include_libraries=include_libraries,
+            output=console,
+            session=session,
+        )
+    except Exception as e:
+        console.print(f"[red]{e}")
+        exit(-1)
+
+
+@click.command("fetch")
+@opt_token
+@opt_pdk_root
+@click.option(
+    "-f",
+    "--metadata-file",
+    "tool_metadata_file_path",
+    default=None,
+    help="Explicitly define a tool metadata file instead of searching for a metadata file",
+)
+@click.option(
+    "-l",
+    "--include-libraries",
+    multiple=True,
+    default=None,
+    help="Libraries to include. You can use -l multiple times to include multiple libraries. Pass 'all' to include all of them. A default of 'None' uses a default set for the particular PDK.",
+)
+@click.argument("version", required=False)
+def fetch_cmd(
+    pdk_root,
+    pdk,
+    tool_metadata_file_path,
+    version,
+    include_libraries,
+    session,
+):
+    """
+    Fetches a PDK to Volare's store without setting it as the "enabled" version
+    in ``PDK_ROOT``.
+
+    Parameters: <version> (Optional)
+
+    If a version is not given, and you run this in the top level directory of
+    tools with a tool_metadata.yml file, for example OpenLane or DFFRAM,
+    the appropriate version will be enabled automatically.
+    """
+    if include_libraries == ():
+        include_libraries = None
+
+    console = Console()
+    try:
+        version = resolve_version(version, tool_metadata_file_path)
+    except Exception as e:
+        console.print(f"Could not determine open_pdks version: {e}")
+        exit(-1)
+
+    try:
+        version = fetch(
             pdk_root=pdk_root,
             pdk=pdk,
             version=version,
             include_libraries=include_libraries,
             output=console,
+            session=session,
         )
+        print(version.get_dir(pdk_root), end="")
+
     except Exception as e:
         console.print(f"[red]{e}")
         exit(-1)
@@ -325,6 +399,7 @@ cli.add_command(path_cmd)
 cli.add_command(list_cmd)
 cli.add_command(list_remote_cmd)
 cli.add_command(enable_cmd)
+cli.add_command(fetch_cmd)
 cli.add_command(enable_or_build_cmd)
 
 try:

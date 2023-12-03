@@ -22,7 +22,7 @@ from typing import Callable, Optional, TypeVar
 from rich.console import Console
 
 from ..common import mkdirp
-from ..github import credentials
+from ..github import GitHubSession
 
 T = TypeVar("T")
 
@@ -53,7 +53,7 @@ def with_magic(
 
         console = Console()
         console.status("Downloading Magic repo…")
-        magic_req = credentials.get_session().get(
+        magic_req = GitHubSession().get(
             f"https://github.com/RTimothyEdwards/magic/tarball/{magic_tag}",
         )
         with open(magic_tgz, "wb") as f:

@@ -26,10 +26,10 @@ from rich.console import Console
 from rich.progress import Progress
 
 from ..github import (
+    GitHubSession,
     get_open_pdks_commit_date,
     VOLARE_REPO_NAME,
     VOLARE_REPO_OWNER,
-    credentials,
 )
 from ..common import (
     Version,
@@ -140,12 +140,16 @@ def push(
     pdk_root,
     pdk,
     version,
+    *,
     owner=VOLARE_REPO_OWNER,
     repository=VOLARE_REPO_NAME,
     pre=False,
     push_libraries=None,
+    session: Optional[GitHubSession] = None,
 ):
-    if credentials.token is None:
+    if session is None:
+        session = GitHubSession()
+    if session.github_token is None:
         raise TypeError("No GitHub token was provided.")
 
     console = Console()
@@ -201,7 +205,7 @@ def push(
     console.log("Starting upload…")
 
     body = f"{pdk} variants built using volare"
-    date = get_open_pdks_commit_date(version)
+    date = get_open_pdks_commit_date(version, session)
     if date is not None:
         body = f"{pdk} variants built using open_pdks {version} (released on {date_to_iso8601(date)})"
 
@@ -214,7 +218,7 @@ def push(
                 "-repository",
                 repository,
                 "-token",
-                credentials.token,
+                session.github_token,
                 "-body",
                 body,
                 "-commitish",
@@ -245,7 +249,15 @@ def push_cmd(owner, repository, pre, pdk_root, pdk, version, push_libraries):
     """
     console = Console()
     try:
-        push(pdk_root, pdk, version, owner, repository, pre, push_libraries)
+        push(
+            pdk_root,
+            pdk,
+            version,
+            owner=owner,
+            repository=repository,
+            pre=pre,
+            push_libraries=push_libraries,
+        )
     except Exception as e:
         console.print(f"[red]Failed to push version: {e}")
         exit(-1)
