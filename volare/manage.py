@@ -16,6 +16,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+import warnings
 from typing import Iterable, List, Optional, Union
 
 import rich
@@ -26,12 +27,12 @@ import zstandard as zstd
 from rich.console import Console
 
 from .build.git_multi_clone import mkdirp
+from .github import GitHubSession
 from .common import (
     Version,
     get_versions_dir,
     get_volare_dir,
 )
-from .github import credentials
 from .build import build, push
 from .families import Family
 
@@ -41,7 +42,12 @@ class VersionNotFound(Exception):
 
 
 def print_installed_list(
-    pdk_root: str, pdk: str, console: Console, installed_list: List[Version]
+    pdk_root: str,
+    pdk: str,
+    *,
+    console: Console,
+    installed_list: List[Version],
+    session: Optional[GitHubSession] = None,
 ):
     if len(installed_list) == 0:
         console.print("[red]No PDKs installed.")
@@ -50,7 +56,7 @@ def print_installed_list(
     versions = installed_list
 
     try:
-        all_remote_versions = Version._from_github()
+        all_remote_versions = Version._from_github(session)
         remote_versions = all_remote_versions.get(pdk) or []
         remote_version_dict = {rv.name: rv for rv in remote_versions}
         for installed in installed_list:
@@ -81,7 +87,10 @@ def print_installed_list(
 
 
 def print_remote_list(
-    pdk_root: str, pdk: str, console: Console, pdk_list: List[Version]
+    pdk_root: str,
+    pdk: str,
+    console: Console,
+    pdk_list: List[Version],
 ):
     installed_list = Version.get_all_installed(pdk_root, pdk)
 
@@ -104,17 +113,22 @@ def print_remote_list(
     console.print(tree)
 
 
-def get(
+def fetch(
     pdk_root: str,
     pdk: str,
     version: str,
+    *,
     build_if_not_found=False,
     also_push=False,
     build_kwargs: dict = {},
     push_kwargs: dict = {},
     include_libraries: Optional[Iterable[str]] = None,
     output: Union[Console, io.TextIOWrapper] = Console(),
-):
+    session: Optional[GitHubSession] = None,
+) -> Version:
+    if session is None:
+        session = GitHubSession()
+
     console = output
     if not isinstance(console, Console):
         console = Console(file=console)
@@ -127,11 +141,7 @@ def get(
     if pdk_family is None:
         raise ValueError(f"Unsupported PDK family '{pdk}'.")
 
-    if include_libraries is None:
-        include_libraries = pdk_family.default_includes
-    if "all" in include_libraries:
-        include_libraries = pdk_family.all_libraries
-    include_libraries = list(include_libraries)
+    library_set = pdk_family.resolve_libraries(include_libraries)
 
     variants = pdk_family.variants
 
@@ -141,7 +151,7 @@ def get(
     if not os.path.isdir(libs_tech):
         common_missing = True
 
-    for library in include_libraries:
+    for library in library_set:
         if library not in pdk_family.all_libraries:
             raise RuntimeError(f"Unknown library {library}.")
         for variant in variants:
@@ -168,14 +178,15 @@ def get(
             release_link_list = version_object.get_release_links(
                 missing_libraries,
                 include_common=common_missing,
+                session=session,
             )
             tarball_directory = tempfile.TemporaryDirectory(suffix=".volare")
             for name, link in release_link_list:
                 tarball_path = os.path.join(tarball_directory.name, name)
                 tarball_paths.append(tarball_path)
-                with credentials.get_session().stream(
-                    "get", link
-                ) as r, rich.progress.Progress(console=console) as p:
+                with session.stream("get", link) as r, rich.progress.Progress(
+                    console=console
+                ) as p:
                     task = p.add_task(
                         f"Downloading {name}…",
                         total=int(r.headers["Content-length"]),
@@ -248,18 +259,25 @@ def get(
                 with open(variant_sources_file, "w") as f:
                     print(f"open_pdks {version}", file=f)
 
+    return Version(version, pdk)
+
 
 def enable(
     pdk_root: str,
     pdk: str,
     version: str,
-    build_if_not_found=False,
-    also_push=False,
+    *,
+    build_if_not_found: bool = False,
+    also_push: bool = False,
     build_kwargs: dict = {},
     push_kwargs: dict = {},
     include_libraries: Optional[List[str]] = None,
     output: Union[Console, io.TextIOWrapper] = Console(),
-):
+    session: Optional[GitHubSession] = None,
+) -> Version:
+    if session is None:
+        session = GitHubSession()
+
     console = output
     if not isinstance(console, Console):
         console = Console(file=console)
@@ -275,16 +293,17 @@ def enable(
     version_paths = [os.path.join(version_directory, variant) for variant in variants]
     final_paths = [os.path.join(pdk_root, variant) for variant in variants]
 
-    get(
+    fetch(
         pdk_root,
         pdk,
         version,
-        build_if_not_found,
-        also_push,
-        build_kwargs,
-        push_kwargs,
-        include_libraries,
+        build_if_not_found=build_if_not_found,
+        also_push=also_push,
+        build_kwargs=build_kwargs,
+        push_kwargs=push_kwargs,
+        include_libraries=include_libraries,
         output=output,
+        session=session,
     )
 
     current_file = os.path.join(get_volare_dir(pdk_root, pdk), "current")
@@ -310,14 +329,9 @@ def enable(
             f.write(version)
 
     console.print(f"Version {version} enabled for the {pdk} PDK.")
+    return version_object
 
 
-def root_for(
-    pdk_root: str,
-    pdk: str,
-    version: str,
-) -> str:
-    """
-    Deprecated: use ``Version().get_dir()``
-    """
-    return Version(version, pdk).get_dir(pdk_root)
+def get(*args, **kwargs):
+    warnings.warn("get() has been deprecated: use fetch()")
+    return fetch(*args, **kwargs)

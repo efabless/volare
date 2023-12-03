@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import pathlib
+import warnings
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Iterable, Optional, List, Dict, Tuple, Union
@@ -143,8 +144,11 @@ class Version(object):
         ]
 
     @classmethod
-    def _from_github(Self) -> Dict[str, List["Version"]]:
-        releases = github.get_releases()
+    def _from_github(
+        Self,
+        session: Optional[github.GitHubSession] = None,
+    ) -> Dict[str, List["Version"]]:
+        releases = github.get_releases(session)
 
         rvs_by_pdk: Dict[str, List["Version"]] = {}
 
@@ -181,9 +185,12 @@ class Version(object):
         return rvs_by_pdk
 
     def get_release_links(
-        self, scl_filter: Iterable[str], include_common: bool
+        self,
+        scl_filter: Iterable[str],
+        include_common: bool,
+        session: Optional[github.GitHubSession] = None,
     ) -> List[Tuple[str, str]]:
-        release = github.get_release_links(f"{self.pdk}-{self.name}")
+        release = github.get_release_links(f"{self.pdk}-{self.name}", session)
 
         assets = release["assets"]
         zst_files = []
@@ -258,17 +265,26 @@ def resolve_version(
 
 
 def get_current_version(pdk_root: str, pdk: str) -> Optional[str]:
-    # DEPRECATED: Use `Version.get_current()`
+    warnings.warn("get_current_version() is deprecated, use Version.get_current()")
     return _get_current_version(pdk_root, pdk)
 
 
 def get_installed_list(pdk_root: str, pdk: str) -> list:
-    # DEPRECATED: Use `Version.get_all_installed()`
+    warnings.warn("get_installed_list() is deprecated, use Version.get_all_installed()")
     return Version.get_all_installed(pdk_root, pdk)
 
 
 def get_version_dir(pdk_root: str, pdk: str, version: Union[str, Version]) -> str:
-    # DEPRECATED: Use `Version().get_dir()`
+    warnings.warn("get_version_dir() is deprecated, use Version().get_dir()")
     if not isinstance(version, Version):
         version = Version(version, pdk)
     return version.get_dir(pdk_root)
+
+
+def root_for(
+    pdk_root: str,
+    pdk: str,
+    version: str,
+) -> str:
+    warnings.warn("root_for() has been deprecated: use Version().get_dir()")
+    return Version(version, pdk).get_dir(pdk_root)

@@ -18,7 +18,7 @@ from typing import Callable, Optional
 import click
 
 from .common import VOLARE_RESOLVED_HOME
-from .github import VOLARE_REPO_OWNER, VOLARE_REPO_NAME, credentials
+from .github import VOLARE_REPO_OWNER, VOLARE_REPO_NAME, GitHubSession
 
 opt = partial(click.option, show_default=True)
 
@@ -107,17 +107,16 @@ def set_token_cb(
     param: click.Parameter,
     value: Optional[str],
 ):
-    if value is not None:
-        credentials.token = value
+    return GitHubSession(github_token=value)
 
 
 def opt_token(function: Callable) -> Callable:
     function = opt(
         "-t",
         "--token",
+        "session",
         default=None,
         required=False,
-        expose_value=False,
         help="Replace the GitHub token used for GitHub requests, which is by default the value of the environment variable GITHUB_TOKEN or None.",
         callback=set_token_cb,
     )(function)

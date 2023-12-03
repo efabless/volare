@@ -11,8 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from .manage import VersionNotFound, enable, get, root_for
-from .common import get_volare_home, get_current_version, get_installed_list, Version
+from .manage import (
+    VersionNotFound,
+    enable,
+    get,
+    fetch,
+)
+from .common import (
+    get_volare_home,
+    get_current_version,
+    get_installed_list,
+    Version,
+    root_for,
+)
+from .github import (
+    GitHubSession,
+)
 from .build import build
 
 from .__version__ import __version__

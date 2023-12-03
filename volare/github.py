@@ -16,7 +16,6 @@ import json
 import yaml
 import httpx
 from datetime import datetime
-from dataclasses import dataclass
 from typing import Any, List, Mapping, Optional
 
 from .__version__ import __version__
@@ -54,33 +53,43 @@ def _get_gh_token() -> Optional[str]:
     if env_token is not None and env_token.strip() != "":
         token = env_token
 
-    # 2. Highest priority: the -t flag (set using a callback to the CLI)
+    # 2. Highest priority: the -t flag: passed to constructor
 
     return token
 
 
-@dataclass
-class GitHubCredentials:
-    token: Optional[str] = _get_gh_token()
+class GitHubSession(httpx.Client):
+    def __init__(
+        self,
+        *,
+        follow_redirects: bool = True,
+        github_token: Optional[str] = _get_gh_token(),
+        **kwargs,
+    ):
+        # print("Constructed session")
+        # traceback.print_stack()
+        super().__init__(follow_redirects=follow_redirects, **kwargs)
+        raw_headers = {
+            "User-Agent": type(self).get_user_agent(),
+        }
+        if github_token is not None:
+            raw_headers["Authorization"] = f"Bearer {github_token}"
+        self.headers = httpx.Headers(raw_headers)
+        self.github_token = github_token
 
-    def get_session(self) -> httpx.Client:
-        session = httpx.Client(follow_redirects=True)
-        if self.token is not None:
-            session.headers = httpx.Headers(
-                {
-                    "Authorization": f"token {self.token}",
-                    "User-Agent": f"volare/{__version__}",
-                }
-            )
-        return session
+    @classmethod
+    def get_user_agent(Self) -> str:
+        return f"volare/{__version__}"
 
 
-credentials = GitHubCredentials()
+def get_open_pdks_commit_date(
+    commit: str, session: Optional[GitHubSession] = None
+) -> Optional[datetime]:
+    if session is None:
+        session = GitHubSession()
 
-
-def get_open_pdks_commit_date(commit: str) -> Optional[datetime]:
     try:
-        request = credentials.get_session().get(f"{OPDKS_REPO_API}/commits/{commit}")
+        request = session.get(f"{OPDKS_REPO_API}/commits/{commit}")
         request.raise_for_status()
     except httpx.HTTPError:
         return None
@@ -92,18 +101,24 @@ def get_open_pdks_commit_date(commit: str) -> Optional[datetime]:
     return commit_date
 
 
-def get_releases() -> List[Mapping[str, Any]]:
-    req = credentials.get_session().get(
-        f"{VOLARE_REPO_API}/releases", params={"per_page": 100}
-    )
+def get_releases(session: Optional[GitHubSession] = None) -> List[Mapping[str, Any]]:
+    if session is None:
+        session = GitHubSession()
+
+    req = session.get(f"{VOLARE_REPO_API}/releases", params={"per_page": 100})
     req.raise_for_status()
 
     return req.json()
 
 
-def get_release_links(release: str) -> Mapping[str, Any]:
+def get_release_links(
+    release: str, session: Optional[GitHubSession] = None
+) -> Mapping[str, Any]:
+    if session is None:
+        session = GitHubSession()
+
     release_api_link = f"{VOLARE_REPO_API}/releases/tags/{release}"
-    req = credentials.get_session().get(release_api_link)
+    req = session.get(release_api_link)
     req.raise_for_status()
 
     return req.json()

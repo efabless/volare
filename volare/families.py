@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Dict
+from typing import Iterable, List, Dict, Optional, Set
 
 
 class Family(object):
@@ -28,6 +28,25 @@ class Family(object):
         self.variants = variants
         self.default_includes = default_includes
         self.all_libraries = all_libraries
+
+    def resolve_libraries(
+        self,
+        input: Optional[Iterable[str]],
+    ) -> Set[str]:
+        if input is None:
+            input = ("default",)
+        final_set: Set[str] = set()
+        for element in input:
+            if element.lower() == "all":
+                final_set = set(self.all_libraries)
+                return final_set
+            elif element.lower() == "default":
+                final_set = final_set.union(set(self.default_includes))
+            elif element in self.all_libraries:
+                final_set.add(element)
+            else:
+                raise ValueError(f"Unknown library {element} for PDK {self.name}")
+        return final_set
 
 
 Family.by_name = {}
