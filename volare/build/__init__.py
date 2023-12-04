@@ -104,6 +104,7 @@ def build_cmd(
     version,
     use_repo_at,
     build_magic,
+    session,
 ):
     """
     Builds the requested PDK.
