@@ -220,13 +220,24 @@ def fetch(
                 console.print(
                     f"Version {version} not found remotely, attempting to build…"
                 )
-                build(pdk_root=pdk_root, pdk=pdk, version=version, **build_kwargs)
+                build(
+                    pdk_root=pdk_root,
+                    pdk=pdk,
+                    version=version,
+                    **build_kwargs,
+                )
                 if also_push:
                     if push_kwargs["push_libraries"] is None:
                         push_kwargs["push_libraries"] = Family.by_name[
                             pdk
                         ].default_includes.copy()
-                    push(pdk_root=pdk_root, pdk=pdk, version=version, **push_kwargs)
+                    push(
+                        pdk_root=pdk_root,
+                        pdk=pdk,
+                        version=version,
+                        session=session,
+                        **push_kwargs,
+                    )
             else:
                 if e.response is not None:
                     raise RuntimeError(
