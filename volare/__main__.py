@@ -338,6 +338,7 @@ def enable_or_build_cmd(
     use_repo_at,
     build_magic,
     push_libraries,
+    session,
 ):
     """
     Attempts to activate a given PDK version. If the version is not found locally or remotely,
@@ -378,6 +379,7 @@ def enable_or_build_cmd(
             },
             include_libraries=include_libraries,
             output=console,
+            session=session,
         )
     except Exception as e:
         console.print(f"[red]{e}")

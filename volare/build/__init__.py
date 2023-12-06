@@ -240,7 +240,16 @@ def push(
 @opt_pdk_root
 @opt_push
 @click.argument("version")
-def push_cmd(owner, repository, pre, pdk_root, pdk, version, push_libraries):
+def push_cmd(
+    owner,
+    repository,
+    pre,
+    pdk_root,
+    pdk,
+    version,
+    push_libraries,
+    session,
+):
     """
     For maintainers: Package and release a build to the public.
 
@@ -258,6 +267,7 @@ def push_cmd(owner, repository, pre, pdk_root, pdk, version, push_libraries):
             repository=repository,
             pre=pre,
             push_libraries=push_libraries,
+            session=session,
         )
     except Exception as e:
         console.print(f"[red]Failed to push version: {e}")
