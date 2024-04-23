@@ -264,6 +264,7 @@ LIB_FLAG_MAP = {
     "sky130_fd_sc_ms": "--enable-sc-ms-sky130",
     "sky130_fd_sc_hs": "--enable-sc-hs-sky130",
     "sky130_sram_macros": "--enable-sram-sky130",
+    "sky130_fd_pr_reram": "--enable-reram-sky130",
 }
 
 
@@ -307,7 +308,7 @@ def build_variants(
                 if library not in include_libraries
             ]
         )
-        console.log(f'Using libraries {" ".join(library_flags)}')
+        console.log(f'Configuring with flags {" ".join(library_flags)}')
 
         with console.status("Configuring open_pdks…"):
             run_sh(
