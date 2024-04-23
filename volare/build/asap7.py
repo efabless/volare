@@ -146,8 +146,8 @@ def build(
     using_repos: Optional[Dict[str, str]] = None,
     build_magic: bool = False,
 ):
-    family = Family.by_name["asap7"]
-    _ = family.resolve_libraries(include_libraries)
+    # family = Family.by_name["asap7"]
+    # _ = family.resolve_libraries(include_libraries)
 
     if using_repos is None:
         using_repos = {}

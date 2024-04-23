@@ -19,15 +19,18 @@ class Family(object):
 
     def __init__(
         self,
+        *,
         name: str,
         variants: List[str],
-        default_includes: List[str],
         all_libraries: List[str],
+        default_variant: Optional[str] = None,
+        default_includes: Optional[List[str]] = None,
     ):
         self.name = name
         self.variants = variants
-        self.default_includes = default_includes
         self.all_libraries = all_libraries
+        self.default_variant = default_variant or variants[0]
+        self.default_includes = default_includes or all_libraries.copy()
 
     def resolve_libraries(
         self,
@@ -51,18 +54,10 @@ class Family(object):
 
 Family.by_name = {}
 Family.by_name["sky130"] = Family(
-    "sky130",
-    ["sky130A", "sky130B"],
-    [
-        "sky130_fd_io",
-        "sky130_fd_pr",
-        "sky130_fd_sc_hd",
-        "sky130_fd_sc_hvl",
-        "sky130_ml_xx_hd",
-        "sky130_sram_macros",
-        "sky130_fd_pr_reram",
-    ],
-    [
+    name="sky130",
+    variants=["sky130A", "sky130B"],
+    default_variant="sky130A",
+    all_libraries=[
         "sky130_fd_io",
         "sky130_fd_pr",
         "sky130_ml_xx_hd",
@@ -76,18 +71,21 @@ Family.by_name["sky130"] = Family(
         "sky130_sram_macros",
         "sky130_fd_pr_reram",
     ],
+    default_includes=[
+        "sky130_fd_io",
+        "sky130_fd_pr",
+        "sky130_fd_sc_hd",
+        "sky130_fd_sc_hvl",
+        "sky130_ml_xx_hd",
+        "sky130_sram_macros",
+        "sky130_fd_pr_reram",
+    ],
 )
 Family.by_name["gf180mcu"] = Family(
-    "gf180mcu",
-    ["gf180mcuA", "gf180mcuB", "gf180mcuC", "gf180mcuD"],
-    [
-        "gf180mcu_fd_io",
-        "gf180mcu_fd_pr",
-        "gf180mcu_fd_sc_mcu7t5v0",
-        "gf180mcu_fd_sc_mcu9t5v0",
-        "gf180mcu_fd_ip_sram",
-    ],
-    [
+    name="gf180mcu",
+    variants=["gf180mcuA", "gf180mcuB", "gf180mcuC", "gf180mcuD"],
+    default_variant="gf180mcuD",
+    all_libraries=[
         "gf180mcu_fd_io",
         "gf180mcu_fd_pr",
         "gf180mcu_fd_sc_mcu7t5v0",
@@ -96,7 +94,14 @@ Family.by_name["gf180mcu"] = Family(
         "gf180mcu_osu_sc_gp12t3v3",
         "gf180mcu_osu_sc_gp9t3v3",
     ],
+    default_includes=[
+        "gf180mcu_fd_io",
+        "gf180mcu_fd_pr",
+        "gf180mcu_fd_sc_mcu7t5v0",
+        "gf180mcu_fd_sc_mcu9t5v0",
+        "gf180mcu_fd_ip_sram",
+    ],
 )
-Family.by_name["asap7"] = Family(
-    "asap7", ["asap7"], default_includes=[], all_libraries=[]
-)
+# Family.by_name["asap7"] = Family(
+#     name="asap7", variants=["asap7"], default_includes=[], all_libraries=[]
+# )
