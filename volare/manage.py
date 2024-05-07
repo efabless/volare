@@ -187,9 +187,13 @@ def fetch(
                 with session.stream("get", link) as r, rich.progress.Progress(
                     console=console
                 ) as p:
+                    total_str: Optional[str] = r.headers.get("Content-length", None)
+                    total_int: Optional[int] = None
+                    if total_str is not None:
+                        total_int = int(total_str)
                     task = p.add_task(
                         f"Downloading {name}…",
-                        total=int(r.headers["Content-length"]),
+                        total=total_int,
                     )
                     r.raise_for_status()
                     with open(tarball_path, "wb") as f:
