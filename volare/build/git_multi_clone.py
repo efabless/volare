@@ -57,7 +57,7 @@ class Repository(object):
         except FileNotFoundError:
             pass
 
-        callback(0, f"Cloning {self.name}…")
+        callback(0, f"Cloning {self.name} to {self.path}…")
 
         process = subprocess.Popen(
             ["git", "clone", "--progress", self.url, self.path],
@@ -112,7 +112,7 @@ class Repository(object):
             stderr=subprocess.PIPE,
         )
         assert process.stderr is not None
-        callback(0, f"Updating {self.name}…")
+        callback(0, f"Updating {self.name} at {self.path}…")
 
         ro_rx = re.compile(r"Receiving objects:\s*(\d+)%")
 

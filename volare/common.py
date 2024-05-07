@@ -202,16 +202,12 @@ class Version(object):
                 ) or asset_scl in scl_filter:
                     zst_files.append((asset["name"], asset["browser_download_url"]))
 
-        if len(zst_files):
-            return zst_files
-        if scl_filter is not None:
+        if len(zst_files) == 0:
             raise ValueError(
                 f"No files found for standard cell libraries: {scl_filter}."
             )
 
-        raise Exception(
-            f"The release for {self.pdk}-{self.name} is malformed. Please file a bug report."
-        )
+        return zst_files
 
 
 def resolve_version(

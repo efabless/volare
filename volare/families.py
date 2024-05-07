@@ -69,6 +69,7 @@ Family.by_name["sky130"] = Family(
         "sky130_fd_sc_ms",
         "sky130_fd_sc_hs",
         "sky130_sram_macros",
+        "sky130_fd_pr_reram",
     ],
     default_includes=[
         "sky130_fd_io",
@@ -77,6 +78,7 @@ Family.by_name["sky130"] = Family(
         "sky130_fd_sc_hvl",
         "sky130_ml_xx_hd",
         "sky130_sram_macros",
+        "sky130_fd_pr_reram",
     ],
 )
 Family.by_name["gf180mcu"] = Family(
