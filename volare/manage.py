@@ -154,10 +154,13 @@ def fetch(
     for library in library_set:
         if library not in pdk_family.all_libraries:
             raise RuntimeError(f"Unknown library {library}.")
+        found = False
         for variant in variants:
             lib_path = os.path.join(version_directory, variant, "libs.ref", library)
-            if not os.path.isdir(lib_path):
-                missing_libraries.add(library)
+            if os.path.isdir(lib_path):
+                found = True
+        if not found:
+            missing_libraries.add(library)
 
     affected_paths = []
     if len(missing_libraries) != 0 or common_missing:
