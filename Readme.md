@@ -125,13 +125,9 @@ PDK version 7519dfb04400f224f140749cda44ee7de6f5e095 enabled.
 What's more is: if you're using a repository with a `tool_metadata.yml` file, such as [OpenLane](https://github.com/The-OpenROAD-Project/OpenLane) or [DFFRAM](https://github.com/Cloud-V/DFFRAM), you can just invoke `volare enable --pdk sky130` without the commit hash and Volare will automatically extract the version required by the utility. Once again, if you omit the `--pdk` argument, `sky130` will be used as a default.
 
 ## Building PDKs
-For special cases, i.e. you require other libraries, you'll have to build the PDK yourself, which Volare does support.
+For special cases, you may have to build the PDK yourself, which Volare does support.
 
-You'll either need Magic installed or you'll need to pass the flag `--build-magic` to build Magic ad-hoc for the PDK build, the latter option of which is only supported on Linux and requires all of Magic's dependencies to be installed. On Ubuntu, that's:
-
-```sh
-sudo apt-get install -y python3 tcsh tcl-dev tk-dev libcairo2-dev m4
-```
+You'll need Magic installed and in PATH. You can either do that manually or, if you have [Nix](https://nixos.org), invoke `nix shell github:efabless/openlane2#magic` before building.
 
 You can invoke `volare build --help` for more options. Be aware, the built PDK won't automatically be enabled and you'll have to `volare enable` the appropriate version.
 

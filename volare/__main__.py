@@ -336,7 +336,6 @@ def enable_or_build_cmd(
     also_push,
     version,
     use_repo_at,
-    build_magic,
     push_libraries,
     session,
 ):
@@ -369,7 +368,6 @@ def enable_or_build_cmd(
                 "jobs": jobs,
                 "clear_build_artifacts": clear_build_artifacts,
                 "use_repo_at": use_repo_at,
-                "build_magic": build_magic,
             },
             push_kwargs={
                 "owner": owner,
