@@ -15,6 +15,7 @@ import os
 import io
 import json
 import venv
+import shlex
 import shutil
 import subprocess
 from datetime import datetime
@@ -25,9 +26,8 @@ import pcpp
 from rich.console import Console
 from rich.progress import Progress
 
-from .magic import with_magic
-from .common import RepoMetadata
 from .git_multi_clone import GitMultiClone
+from .common import RepoMetadata, patch_open_pdks
 from ..families import Family
 from ..github import OPDKS_REPO_HTTPS
 from ..common import (
@@ -78,8 +78,7 @@ def get_open_pdks(
         else:
             console.log(f"Using open_pdks at {repo_path} unaltered.")
 
-        sky130_tag = None
-        magic_tag = None
+        patch_open_pdks(repo_path)
 
         try:
             json_raw = open(f"{repo_path}/sky130/sky130.json").read()
@@ -92,76 +91,16 @@ def get_open_pdks(
                 json_str = sio.getvalue()
             manifest = json.loads(json_str)
             reference_commits = manifest["reference"]
-            magic_tag = reference_commits["magic"]
+            print(f"Reference commits: {reference_commits}")
         except FileNotFoundError:
-            console.log(
-                "Cannot find open_pdks/sky130 JSON manifest. Default version for magic will be used."
-            )
+            console.log("Warning: Couldn't find open_pdks/sky130 JSON manifest.")
         except json.JSONDecodeError:
-            console.log(
-                "Failed to parse open_pdks/sky130 JSON manifest. Default version for magic will be used."
-            )
+            console.log("Warning: Failed to parse open_pdks/sky130 JSON manifest..")
         except KeyError:
             console.log(
-                "Failed to extract reference commits from open_pdks/sky130 JSON manifest. Default version for magic will be used."
+                "Warning: Failed to extract reference commits from open_pdks/sky130 JSON manifest."
             )
 
-        return (repo_path, sky130_tag, magic_tag)
-
-    except subprocess.CalledProcessError as e:
-        print(e)
-        print(e.stderr)
-        exit(-1)
-
-
-def get_sky130(
-    include_libraries, build_directory, commit=None, jobs=1, repo_path=None
-) -> str:
-    try:
-        if repo_path is not None:
-            return repo_path
-
-        console = Console()
-
-        sky130_repo = None
-        sky130_submodules = []
-
-        sky130 = repo_metadata["sky130"]
-        sky130_commit = commit or sky130.default_commit
-        console.log(f"Using sky130 {sky130_commit}…")
-
-        with Progress() as progress:
-            with ThreadPoolExecutor(max_workers=jobs) as executor:
-                gmc = GitMultiClone(build_directory, progress)
-                sky130_fut = executor.submit(
-                    GitMultiClone.clone,
-                    gmc,
-                    sky130.repo,
-                    sky130_commit,
-                    sky130.default_branch,
-                )
-                sky130_repo = sky130_fut.result()
-                repo_path = sky130_repo.path
-                sky130_submodules = (
-                    subprocess.check_output(
-                        ["find", "libraries", "-type", "d", "-name", "latest"],
-                        stderr=subprocess.PIPE,
-                        cwd=sky130_repo.path,
-                    )
-                    .decode("utf8")
-                    .strip()
-                    .split("\n")
-                )
-                sky130_submodules_filtered = [
-                    sm
-                    for sm in sky130_submodules
-                    if (sm.split("/")[1] in include_libraries)
-                ]
-                for submodule in sky130_submodules_filtered:
-                    executor.submit(
-                        GitMultiClone.clone_submodule, gmc, sky130_repo, submodule
-                    )
-        console.log("Done fetching sky130 repositories.")
         return repo_path
 
     except subprocess.CalledProcessError as e:
@@ -308,14 +247,18 @@ def build_variants(
                 if library not in include_libraries
             ]
         )
-        console.log(f'Configuring with flags {" ".join(library_flags)}')
+
+        configuration_flags = ["--enable-sky130-pdk", "--with-reference"] + list(
+            library_flags.union(library_flags_disable)
+        )
+        console.log(f"Configuring with flags {shlex.join(configuration_flags)}")
 
         with console.status("Configuring open_pdks…"):
             run_sh(
                 f"""
                     set -e
                     export PATH="{magic_dirname}:$PATH"
-                    ./configure --enable-sky130-pdk {" ".join(library_flags)} {" ".join(library_flags_disable)} --with-reference
+                    ./configure {shlex.join(configuration_flags)}
                 """,
                 log_to=os.path.join(log_dir, "config.log"),
             )
@@ -334,16 +277,6 @@ def build_variants(
             )
         console.log("Built PDK variants.")
 
-        with console.status("Fixing file ownership…"):
-            run_sh(
-                f"""
-                set -e
-                OWNERSHIP="$(stat -c "%u:%g" "{pdk_root_abs}")"
-                chown -R $OWNERSHIP "{pdk_root_abs}"
-                """,
-                log_to=os.path.join(log_dir, "ownership.log"),
-            )
-        console.log("Fixed file ownership.")
         with console.status("Cleaning build artifacts…"):
             run_sh(
                 """
@@ -401,7 +334,6 @@ def build(
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     using_repos: Optional[Dict[str, str]] = None,
-    build_magic: bool = False,
 ):
     family = Family.by_name["sky130"]
     library_set = family.resolve_libraries(include_libraries)
@@ -417,26 +349,23 @@ def build(
     console = Console()
     console.log(f"Logging to '{log_dir}'…")
 
-    open_pdks_path, _, magic_tag = get_open_pdks(
+    open_pdks_path = get_open_pdks(
         version, build_directory, jobs, using_repos.get("open_pdks")
     )
 
-    # magic_tag = ""
-    # open_pdks_path = os.path.join(build_directory, "open_pdks")
-    # sky130_path = os.path.join(build_directory, "skywater-pdk")
+    magic_bin = shutil.which("magic")
+    if magic_bin is None:
+        print("Magic is either not installed or not in PATH.")
+        exit(-1)
 
-    with_magic(
-        magic_tag,
-        lambda magic_bin: build_variants(
-            magic_bin,
-            build_directory,
-            open_pdks_path,
-            library_set,
-            log_dir,
-            jobs,
-        ),
-        build_magic=build_magic,
-    )
+    build_variants(
+        magic_bin,
+        build_directory,
+        open_pdks_path,
+        library_set,
+        log_dir,
+        jobs,
+    ),
     install_sky130(build_directory, pdk_root, version)
 
     if clear_build_artifacts:

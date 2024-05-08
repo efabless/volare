@@ -144,7 +144,6 @@ def build(
     clear_build_artifacts: bool = True,
     include_libraries: Optional[List[str]] = None,
     using_repos: Optional[Dict[str, str]] = None,
-    build_magic: bool = False,
 ):
     # family = Family.by_name["asap7"]
     # _ = family.resolve_libraries(include_libraries)
