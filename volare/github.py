@@ -86,7 +86,7 @@ def get_open_pdks_commit_date(
     commit: str, session: Optional[GitHubSession] = None
 ) -> Optional[datetime]:
     if session is None:
-        session = GitHubSession()
+        session = GitHubSession(proxy=os.getenv("HTTPS_PROXY"))
 
     try:
         request = session.get(f"{OPDKS_REPO_API}/commits/{commit}")
