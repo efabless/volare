@@ -17,6 +17,7 @@
   pyyaml,
   rich,
   httpx,
+  httpx-socks,
   pcpp,
   zstandard,
   nix-gitignore
@@ -41,5 +42,6 @@ buildPythonPackage rec {
     httpx
     pcpp
     zstandard
+    httpx-socks
   ];
 }
