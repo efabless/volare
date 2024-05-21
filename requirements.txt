@@ -4,4 +4,3 @@ rich>=12,<14 # Rich 12 is the last version supporting Python 3.6
 httpx>=0.22.0
 pcpp>=1.2,<2
 zstandard>=0.19.0,<1
-truststore>=0.9.1
