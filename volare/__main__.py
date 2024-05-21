@@ -119,7 +119,7 @@ def rm_cmd(pdk_root, pdk, version):
 @click.command("ls")
 @opt_token
 @opt_pdk_root
-def list_cmd(pdk_root, pdk, session):
+def list_cmd(pdk_root, pdk):
     """Lists PDK versions that are locally installed. JSON if not outputting to a tty."""
 
     pdk_versions = Version.get_all_installed(pdk_root, pdk)
@@ -131,7 +131,6 @@ def list_cmd(pdk_root, pdk, session):
             pdk,
             console=console,
             installed_list=pdk_versions,
-            session=session,
         )
     else:
         print(json.dumps([version.name for version in pdk_versions]), end="")
@@ -140,11 +139,11 @@ def list_cmd(pdk_root, pdk, session):
 @click.command("ls-remote")
 @opt_token
 @opt_pdk_root
-def list_remote_cmd(pdk_root, pdk, session):
+def list_remote_cmd(pdk_root, pdk):
     """Lists PDK versions that are remotely available. JSON if not outputting to a tty."""
 
     try:
-        all_versions = Version._from_github(session)
+        all_versions = Version._from_github()
         pdk_versions = all_versions.get(pdk) or []
 
         if sys.stdout.isatty():
@@ -212,7 +211,6 @@ def enable_cmd(
     tool_metadata_file_path,
     version,
     include_libraries,
-    session,
 ):
     """
     Activates a given installed PDK version.
@@ -240,7 +238,6 @@ def enable_cmd(
             version,
             include_libraries=include_libraries,
             output=console,
-            session=session,
         )
     except Exception as e:
         console.print(f"[red]{e}")
@@ -271,7 +268,6 @@ def fetch_cmd(
     tool_metadata_file_path,
     version,
     include_libraries,
-    session,
 ):
     """
     Fetches a PDK to Volare's store without setting it as the "enabled" version
@@ -300,7 +296,6 @@ def fetch_cmd(
             version=version,
             include_libraries=include_libraries,
             output=console,
-            session=session,
         )
         print(version.get_dir(pdk_root), end="")
 
@@ -337,7 +332,6 @@ def enable_or_build_cmd(
     version,
     use_repo_at,
     push_libraries,
-    session,
 ):
     """
     Attempts to activate a given PDK version. If the version is not found locally or remotely,
@@ -377,7 +371,6 @@ def enable_or_build_cmd(
             },
             include_libraries=include_libraries,
             output=console,
-            session=session,
         )
     except Exception as e:
         console.print(f"[red]{e}")

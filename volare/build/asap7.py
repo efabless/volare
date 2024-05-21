@@ -108,7 +108,6 @@ def install_asap7(build_directory, pdk_root, version):
     console = Console()
     with console.status("Adding build to list of installed versions…"):
         version_directory = get_version_dir(pdk_root, "asap7", version)
-        print(version_directory)
         if (
             os.path.exists(version_directory)
             and len(os.listdir(version_directory)) != 0
