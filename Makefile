@@ -10,7 +10,6 @@ dist: venv/manifest.txt
 
 .PHONY: lint
 lint: venv/manifest.txt
-	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade truststore
 	./venv/bin/black --check .
 	./venv/bin/flake8 .
 	./venv/bin/mypy --check-untyped-defs .
