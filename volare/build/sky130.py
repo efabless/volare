@@ -29,7 +29,7 @@ from rich.progress import Progress
 from .git_multi_clone import GitMultiClone
 from .common import RepoMetadata, patch_open_pdks
 from ..families import Family
-from ..github import OPDKS_REPO_HTTPS
+from ..github import opdks_repo
 from ..common import (
     get_version_dir,
     get_volare_dir,
@@ -38,7 +38,7 @@ from ..common import (
 
 repo_metadata = {
     "open_pdks": RepoMetadata(
-        OPDKS_REPO_HTTPS,
+        opdks_repo.link,
         "34eeb2743e99d44a21c2cedd467675a2e0f3bb91",
         "master",
     ),

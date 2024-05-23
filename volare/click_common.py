@@ -18,7 +18,7 @@ from typing import Callable, Optional
 import click
 
 from .common import VOLARE_RESOLVED_HOME
-from .github import VOLARE_REPO_OWNER, VOLARE_REPO_NAME, GitHubSession
+from .github import volare_repo, GitHubSession
 
 opt = partial(click.option, show_default=True)
 
@@ -77,10 +77,10 @@ def opt_build(function: Callable):
 
 
 def opt_push(function: Callable):
-    function = opt("-o", "--owner", default=VOLARE_REPO_OWNER, help="Repository Owner")(
+    function = opt("-o", "--owner", default=volare_repo.owner, help="Repository Owner")(
         function
     )
-    function = opt("-r", "--repository", default=VOLARE_REPO_NAME, help="Repository")(
+    function = opt("-r", "--repository", default=volare_repo.name, help="Repository")(
         function
     )
     function = opt(
@@ -102,7 +102,7 @@ def set_token_cb(
     param: click.Parameter,
     value: Optional[str],
 ):
-    return GitHubSession(github_token=value)
+    GitHubSession.Token.override = value
 
 
 def opt_token(function: Callable) -> Callable:
@@ -112,6 +112,7 @@ def opt_token(function: Callable) -> Callable:
         "session",
         default=None,
         required=False,
+        expose_value=False,
         help="Replace the GitHub token used for GitHub requests, which is by default the value of the environment variable GITHUB_TOKEN or None.",
         callback=set_token_cb,
     )(function)

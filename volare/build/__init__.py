@@ -28,8 +28,7 @@ from rich.progress import Progress
 from ..github import (
     GitHubSession,
     get_open_pdks_commit_date,
-    VOLARE_REPO_NAME,
-    VOLARE_REPO_OWNER,
+    volare_repo,
 )
 from ..common import (
     Version,
@@ -101,7 +100,6 @@ def build_cmd(
     tool_metadata_file_path,
     version,
     use_repo_at,
-    session,
 ):
     """
     Builds the requested PDK.
@@ -138,8 +136,8 @@ def push(
     pdk,
     version,
     *,
-    owner=VOLARE_REPO_OWNER,
-    repository=VOLARE_REPO_NAME,
+    owner=volare_repo.owner,
+    repository=volare_repo.name,
     pre=False,
     push_libraries=None,
     session: Optional[GitHubSession] = None,
@@ -244,7 +242,6 @@ def push_cmd(
     pdk,
     version,
     push_libraries,
-    session,
 ):
     """
     For maintainers: Package and release a build to the public.
@@ -263,7 +260,6 @@ def push_cmd(
             repository=repository,
             pre=pre,
             push_libraries=push_libraries,
-            session=session,
         )
     except Exception as e:
         console.print(f"[red]Failed to push version: {e}")

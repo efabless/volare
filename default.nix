@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 {
+  lib,
   buildPythonPackage,
   click,
   pyyaml,
@@ -19,7 +20,8 @@
   httpx,
   pcpp,
   zstandard,
-  nix-gitignore
+  truststore,
+  nix-gitignore,
 }:
 
 buildPythonPackage rec {
@@ -41,5 +43,14 @@ buildPythonPackage rec {
     httpx
     pcpp
     zstandard
-  ];
+    truststore
+  ] ++ httpx.optional-dependencies.socks;
+  
+  meta = with lib; {
+    mainProgram = "volare";
+    description = "Version manager and builder for open-source PDKs";
+    homepage = "https://github.com/efabless/volare";
+    license = licenses.asl20;
+    platforms = platforms.darwin ++ platforms.linux;
+  };
 }
