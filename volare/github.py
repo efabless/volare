@@ -15,7 +15,7 @@ import os
 import sys
 from datetime import datetime
 from dataclasses import dataclass
-from typing import Any, ClassVar, List, Literal, Mapping, Optional
+from typing import Any, ClassVar, List, Mapping, Optional
 
 import yaml
 import httpx
@@ -134,7 +134,7 @@ class GitHubSession(httpx.Client):
         self,
         repo: RepoInfo,
         endpoint: str,
-        method: Literal["get"],
+        method: str,
         *args,
         **kwargs,
     ) -> Any:
