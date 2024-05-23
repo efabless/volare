@@ -84,8 +84,8 @@ class GitHubSession(httpx.Client):
                 token = env_token
 
             # 2. Highest priority: the -t flag
-            if override := Self.override:
-                token = override
+            if Self.override is not None:
+                token = Self.override
 
             return token
 
