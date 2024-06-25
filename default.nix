@@ -34,7 +34,6 @@ buildPythonPackage rec {
   src = nix-gitignore.gitignoreSourcePure ./.gitignore ./.;
 
   doCheck = false;
-  PIP_DISABLE_PIP_VERSION_CHECK = "1";
 
   propagatedBuildInputs = [
     click
