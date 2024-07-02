@@ -265,12 +265,12 @@ def build(
 
     build_variants(
         magic_bin,
+        library_set,
         build_directory,
         open_pdks_path,
-        library_set,
         log_dir,
         jobs,
-    ),
+    )
     install_gf180mcu(build_directory, pdk_root, version)
 
     if clear_build_artifacts:
