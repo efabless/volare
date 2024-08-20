@@ -52,14 +52,6 @@ opdks_repo = RepoInfo(
 )
 
 
-class Token:
-    override: ClassVar[Optional[str]] = None
-
-    @classmethod
-    def set_override_token(Self, override: str):
-        Self.override = override
-
-
 class GitHubSession(httpx.Client):
     class Token(object):
         override: ClassVar[Optional[str]] = None
@@ -125,15 +117,15 @@ class GitHubSession(httpx.Client):
                 exit(-1)
             else:
                 raise e from None
+        github_token = github_token or GitHubSession.Token.get_gh_token()
+        self.github_token = github_token
+
         raw_headers = {
             "User-Agent": type(self).get_user_agent(),
         }
         if github_token is not None:
             raw_headers["Authorization"] = f"Bearer {github_token}"
         self.headers = httpx.Headers(raw_headers)
-        if github_token is None:
-            github_token = GitHubSession.Token.get_gh_token()
-        self.github_token = github_token
 
     def api(
         self,
