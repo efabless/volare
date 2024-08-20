@@ -19,10 +19,7 @@ from .manage import (
 )
 from .common import (
     get_volare_home,
-    get_current_version,
-    get_installed_list,
     Version,
-    root_for,
 )
 from .families import Family
 from .github import (

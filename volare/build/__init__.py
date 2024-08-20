@@ -34,7 +34,6 @@ from ..common import (
     Version,
     mkdirp,
     resolve_version,
-    get_version_dir,
     date_to_iso8601,
 )
 from ..click_common import (

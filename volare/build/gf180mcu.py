@@ -26,27 +26,14 @@ from rich.console import Console
 from rich.progress import Progress
 
 from .git_multi_clone import GitMultiClone
-from .common import RepoMetadata, patch_open_pdks
+from .common import patch_open_pdks
 from ..families import Family
 from ..github import opdks_repo
 from ..common import (
-    get_version_dir,
+    Version,
     get_volare_dir,
     mkdirp,
 )
-
-repo_metadata = {
-    "open_pdks": RepoMetadata(
-        opdks_repo.link,
-        "cc0029b45c68137aa21323912f50d2fc17eeea13",
-        "master",
-    ),
-    "gf180mcu": RepoMetadata(
-        "https://github.com/google/gf180mcu-pdk",
-        "08c628b77c4683cad8441d7d0c2df1c8ab58cbc2",
-        "main",
-    ),
-}
 
 MAGIC_DEFAULT_TAG = "085131b090cb511d785baf52a10cf6df8a657d44"
 
@@ -62,13 +49,12 @@ def get_open_pdks(
             with Progress() as progress:
                 with ThreadPoolExecutor(max_workers=jobs) as executor:
                     gmc = GitMultiClone(build_directory, progress)
-                    open_pdks = repo_metadata["open_pdks"]
                     open_pdks_future = executor.submit(
                         GitMultiClone.clone,
                         gmc,
-                        open_pdks.repo,
+                        opdks_repo.link,
                         version,
-                        open_pdks.default_branch,
+                        default_branch="master",
                     )
                     open_pdks_repo = open_pdks_future.result()
                     repo_path = open_pdks_repo.path
@@ -201,7 +187,7 @@ def build_variants(
 def install_gf180mcu(build_directory, pdk_root, version):
     console = Console()
     with console.status("Adding build to list of installed versions…"):
-        version_directory = get_version_dir(pdk_root, "gf180mcu", version)
+        version_directory = Version(version, "gf180mcu").get_dir(pdk_root)
         if (
             os.path.exists(version_directory)
             and len(os.listdir(version_directory)) != 0
@@ -210,7 +196,7 @@ def install_gf180mcu(build_directory, pdk_root, version):
             it = 0
             while os.path.exists(backup_path) and len(os.listdir(backup_path)) != 0:
                 it += 1
-                backup_path = get_version_dir(pdk_root, "gf180mcu", f"{version}.bk{it}")
+                backup_path = Version(f"{version}.bk{it}", "gf180mcu").get_dir(pdk_root)
             console.log(
                 f"Build already found at {version_directory}, moving to {backup_path}…"
             )

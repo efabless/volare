@@ -101,6 +101,3 @@ Family.by_name["gf180mcu"] = Family(
         "gf180mcu_fd_ip_sram",
     ],
 )
-# Family.by_name["asap7"] = Family(
-#     name="asap7", variants=["asap7"], default_includes=[], all_libraries=[]
-# )

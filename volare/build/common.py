@@ -18,13 +18,6 @@ import subprocess
 from volare.github import GitHubSession
 
 
-class RepoMetadata(object):
-    def __init__(self, repo, default_commit, default_branch="main"):
-        self.repo = repo
-        self.default_commit = default_commit
-        self.default_branch = default_branch
-
-
 def open_pdks_fix_makefile(at_path: str):
     backup_path = f"{at_path}.bak"
     shutil.move(at_path, backup_path)

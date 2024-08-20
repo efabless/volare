@@ -15,10 +15,9 @@ import os
 import re
 import shutil
 import pathlib
-import warnings
 from datetime import datetime
 from dataclasses import dataclass
-from typing import Iterable, Optional, List, Dict, Tuple, Union
+from typing import Iterable, Optional, List, Dict, Tuple
 
 from . import github
 from .families import Family
@@ -86,7 +85,7 @@ class Version(object):
         return self.name
 
     def is_installed(self, pdk_root: str) -> bool:
-        version_dir = get_version_dir(pdk_root, self.pdk, self.name)
+        version_dir = self.get_dir(pdk_root)
         return os.path.isdir(version_dir)
 
     def is_current(self, pdk_root: str) -> bool:
@@ -255,32 +254,3 @@ def resolve_version(
     version = open_pdks_list[0]["commit"]
 
     return version
-
-
-# -- The Deprecation Zone
-
-
-def get_current_version(pdk_root: str, pdk: str) -> Optional[str]:
-    warnings.warn("get_current_version() is deprecated, use Version.get_current()")
-    return _get_current_version(pdk_root, pdk)
-
-
-def get_installed_list(pdk_root: str, pdk: str) -> list:
-    warnings.warn("get_installed_list() is deprecated, use Version.get_all_installed()")
-    return Version.get_all_installed(pdk_root, pdk)
-
-
-def get_version_dir(pdk_root: str, pdk: str, version: Union[str, Version]) -> str:
-    warnings.warn("get_version_dir() is deprecated, use Version().get_dir()")
-    if not isinstance(version, Version):
-        version = Version(version, pdk)
-    return version.get_dir(pdk_root)
-
-
-def root_for(
-    pdk_root: str,
-    pdk: str,
-    version: str,
-) -> str:
-    warnings.warn("root_for() has been deprecated: use Version().get_dir()")
-    return Version(version, pdk).get_dir(pdk_root)

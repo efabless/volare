@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import subprocess
 import sys
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Any, ClassVar, List, Mapping, Optional
 
-import yaml
 import httpx
 import ssl
 from .__version__ import __version__
@@ -42,13 +42,13 @@ class RepoInfo:
 
 
 volare_repo = RepoInfo(
-    os.getenv("VOLARE_REPO_OWNER") or "efabless",
-    os.getenv("VOLARE_REPO_NAME") or "volare",
+    os.getenv("VOLARE_REPO_OWNER", "efabless"),
+    os.getenv("VOLARE_REPO_NAME", "volare"),
 )
 
 opdks_repo = RepoInfo(
-    os.getenv("OPDKS_REPO_OWNER") or "RTimothyEdwards",
-    os.getenv("OPDKS_REPO_NAME") or "open_pdks",
+    os.getenv("OPDKS_REPO_OWNER", "RTimothyEdwards"),
+    os.getenv("OPDKS_REPO_NAME", "open_pdks"),
 )
 
 
@@ -68,15 +68,20 @@ class GitHubSession(httpx.Client):
         def get_gh_token(Self) -> Optional[str]:
             token = None
 
-            # 0. Lowest priority: ghcli's hosts.yml
-            ghcli_file = os.path.join(os.path.expanduser("~/.config/gh/hosts.yml"))
-            if os.path.exists(ghcli_file):
-                hosts = yaml.safe_load(open(ghcli_file))
-                gh_host = hosts.get("github.com")
-                if gh_host is not None:
-                    oauth_token = gh_host.get("oauth_token")
-                    if oauth_token is not None:
-                        token = str(oauth_token)
+            # 0. Lowest priority: ghcli
+            try:
+                token = subprocess.check_output(
+                    [
+                        "gh",
+                        "auth",
+                        "token",
+                    ],
+                    encoding="utf8",
+                ).strip()
+            except FileNotFoundError:
+                pass
+            except subprocess.CalledProcessError:
+                pass
 
             # 1. Higher priority: environment GITHUB_TOKEN
             env_token = os.getenv("GITHUB_TOKEN")
