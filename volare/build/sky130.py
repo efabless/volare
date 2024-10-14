@@ -284,7 +284,7 @@ def build_variants(
 def install_sky130(build_directory, pdk_root, version):
     console = Console()
     with console.status("Adding build to list of installed versions…"):
-        version_directory = Version("sky130", version).get_dir(pdk_root)
+        version_directory = Version(version, "sky130").get_dir(pdk_root)
         if (
             os.path.exists(version_directory)
             and len(os.listdir(version_directory)) != 0
