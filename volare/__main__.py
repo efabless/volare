@@ -184,7 +184,7 @@ def path_cmd(pdk_root, pdk, version):
         version = Version(version, pdk)
         print(version.get_dir(pdk_root), end="")
     else:
-        print(get_volare_home())
+        print(get_volare_home(pdk_root))
 
 
 @click.command("enable")
