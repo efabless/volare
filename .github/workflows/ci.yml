@@ -34,7 +34,7 @@ jobs:
       - name: Set Up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.6"
+          python-version: "3.8"
       - name: Build Distribution
         run: |
           make dist

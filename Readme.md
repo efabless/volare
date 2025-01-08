@@ -9,7 +9,7 @@
 <p align="center">Volare is a version manager (and builder) for builds of <a href="https://github.com/google/open-source-pdks">Google open-source PDKs</a> using <a href="https://github.com/rtimothyedwards/open_pdks">open_pdks</a>.</p>
 
 # Requirements
-* Python 3.6+ with PIP
+* Python 3.8+ with PIP
 * macOS or GNU/Linux
 
 ## macOS
@@ -20,7 +20,7 @@ brew install python3
 ```
 
 ## Debian and Ubuntu
-Debian 10+ or Ubuntu 18.04+ is required.
+Debian 11+ or Ubuntu 20.04+ is required.
 
 ```sh
 sudo apt-get update
@@ -28,7 +28,7 @@ sudo apt-get install python3 python3-pip xz-utils
 ```
 
 ## RHEL and Derivatives
-RHEL 7+ or compatible operating system required.
+RHEL 8+ or compatible operating system required.
 ```sh
 sudo yum install -y python3 python3-pip
 ```
@@ -37,27 +37,11 @@ sudo yum install -y python3 python3-pip
 # Installation and Upgrades
 ```sh
 # To install (or upgrade)
-python3 -m pip install --upgrade --no-cache-dir volare
+python3 -m pip install --user --upgrade --no-cache-dir volare
 
 # To verify it works
 volare --version
 ```
-
-## Troubleshooting
-With a typical Python 3.6 or higher installation with PIP, installing `volare` is as simple as a `pip install`. Despite that, there are some peculiarities with PIP itself: For example, you may see a warning among these lines:
-
-```sh
-  WARNING: The script volare is installed in '/home/test/.local/bin' which is not on PATH.
-  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
-```
-
-The solution is as simple as adding something like this to your shell's profile:
-
-```sh
-export PATH="/home/test/.local/bin:$PATH"
-```
-
-Do note that the path (`/home/test/.local/bin` in this example) varies depending on your operating system and version of Python you install, and whether you use `sudo` (absolutely not recommended) or not, so ensure that you actually read the warning and add the correct path.
 
 # About the builds
 In its current inception, volare supports builds of **sky130** and **gf180mcu** PDKs using [Open_PDKs](https://github.com/efabless/open_pdks), including the following libraries:
