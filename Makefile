@@ -1,12 +1,11 @@
 PYTHON3 ?= python3
-REQ_FILES = ./requirements_dev.txt ./requirements.txt
-REQ_FILES_PFX = $(addprefix -r ,$(REQ_FILES))
 
 all: dist
 
+all: dist
 .PHONY: dist
 dist: venv/manifest.txt
-	./venv/bin/python3 setup.py sdist bdist_wheel
+	./venv/bin/poetry build
 
 .PHONY: lint
 lint: venv/manifest.txt
@@ -15,13 +14,15 @@ lint: venv/manifest.txt
 	./venv/bin/mypy --check-untyped-defs .
 
 venv: venv/manifest.txt
-venv/manifest.txt: $(REQ_FILES)
+venv/manifest.txt: ./pyproject.toml
 	rm -rf venv
-	$(PYTHON3) -m venv ./venv
+	python3 -m venv ./venv
 	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade pip
-	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade wheel
-	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade $(REQ_FILES_PFX)
+	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade wheel poetry poetry-plugin-export
+	PYTHONPATH= ./venv/bin/poetry export --with dev --without-hashes --format=requirements.txt --output=requirements_tmp.txt
+	PYTHONPATH= ./venv/bin/python3 -m pip install --upgrade -r requirements_tmp.txt
 	PYTHONPATH= ./venv/bin/python3 -m pip freeze > $@
+	@echo ">> Venv prepared."
 
 .PHONY: veryclean
 veryclean: clean

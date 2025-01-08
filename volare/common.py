@@ -156,7 +156,7 @@ class Version(object):
         for release in releases:
             if release["draft"]:
                 continue
-            family, hash = release["tag_name"].split("-")
+            family, hash = release["tag_name"].rsplit("-", maxsplit=1)
 
             upload_date = date_from_iso8601(release["published_at"])
             commit_date = None

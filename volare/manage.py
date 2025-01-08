@@ -275,7 +275,7 @@ def fetch(
             variant_sources_file = os.path.join(variant_install_path, "SOURCES")
             if not os.path.isfile(variant_sources_file):
                 with open(variant_sources_file, "w") as f:
-                    print(f"open_pdks {version}", file=f)
+                    print(f"{pdk_family.repo.name} {version}", file=f)
 
     return Version(version, pdk)
 

@@ -13,36 +13,43 @@
 # limitations under the License.
 {
   inputs = {
-    nixpkgs.url = github:nixos/nixpkgs/nixos-23.11;
+    nix-eda.url = github:efabless/nix-eda;
   };
 
   outputs = {
     self,
-    nixpkgs,
+    nix-eda,
     ...
-  }: {
-    # Helper functions
-    forAllSystems = function:
-      nixpkgs.lib.genAttrs [
-        "x86_64-linux"
-        "aarch64-linux"
-        "x86_64-darwin"
-        "aarch64-darwin"
-      ] (
-        system:
-          function (import nixpkgs {
-            inherit system;
-          })
-      );
+  }: let
+    nixpkgs = nix-eda.inputs.nixpkgs;
+    lib = nixpkgs.lib;
+  in {
+    overlays = {
+      default = nix-eda.composePythonOverlay (pkgs': pkgs: pypkgs': pypkgs: let
+        callPythonPackage = lib.callPackageWith (pkgs' // pkgs'.python3.pkgs);
+      in {
+        volare = callPythonPackage ./default.nix {};
+      });
+    };
+
+    legacyPackages = nix-eda.forAllSystems (
+      system:
+        import nixpkgs {
+          inherit system;
+          overlays = [
+            nix-eda.overlays.default
+            self.overlays.default
+          ];
+        }
+    );
 
     # Outputs
-    packages = self.forAllSystems (pkgs: let
-      callPackage = pkgs.lib.callPackageWith (pkgs // self.packages.${pkgs.system});
-      callPythonPackage = pkgs.lib.callPackageWith (pkgs // pkgs.python3.pkgs // self.packages.${pkgs.system});
-    in
-      rec {
-        volare = callPythonPackage ./default.nix {};
-        default = volare;
+    packages = nix-eda.forAllSystems (
+      system: let
+        pkgs = self.legacyPackages."${system}";
+      in {
+        inherit (pkgs.python3.pkgs) volare;
+        default = self.packages."${system}".volare;
       }
     );
   };

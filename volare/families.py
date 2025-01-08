@@ -11,26 +11,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Iterable, List, Dict, Optional, Set
+from dataclasses import dataclass
+from typing import Iterable, List, Dict, Optional, Set, ClassVar
+
+from .github import RepoInfo, opdks_repo, ihp_repo
 
 
+@dataclass
 class Family(object):
-    by_name: Dict[str, "Family"] = {}
+    by_name: ClassVar[Dict[str, "Family"]] = {}
 
-    def __init__(
-        self,
-        *,
-        name: str,
-        variants: List[str],
-        all_libraries: List[str],
-        default_variant: Optional[str] = None,
-        default_includes: Optional[List[str]] = None,
-    ):
-        self.name = name
-        self.variants = variants
-        self.all_libraries = all_libraries
-        self.default_variant = default_variant or variants[0]
-        self.default_includes = default_includes or all_libraries.copy()
+    name: str
+    variants: List[str]
+    all_libraries: List[str]
+    repo: RepoInfo
+    # lol no implicitly unwrapped optionals
+    default_variant: str = None  # type: ignore
+    default_includes: List[str] = None  # type: ignore
+
+    def __post_init__(self):
+        if self.default_variant is None:
+            self.default_variant = self.variants[0]
+        if self.default_includes is None:
+            self.default_includes = self.all_libraries.copy()
 
     def resolve_libraries(
         self,
@@ -79,6 +82,7 @@ Family.by_name["sky130"] = Family(
         "sky130_ml_xx_hd",
         "sky130_sram_macros",
     ],
+    repo=opdks_repo,
 )
 Family.by_name["gf180mcu"] = Family(
     name="gf180mcu",
@@ -100,4 +104,16 @@ Family.by_name["gf180mcu"] = Family(
         "gf180mcu_fd_sc_mcu9t5v0",
         "gf180mcu_fd_ip_sram",
     ],
+    repo=opdks_repo,
+)
+Family.by_name["ihp-sg13g2"] = Family(
+    name="ihp-sg13g2",
+    variants=["ihp-sg13g2"],
+    all_libraries=[
+        "sg13g2_io",
+        "sg13g2_pr",
+        "sg13g2_sram",
+        "sg13g2_stdcell",
+    ],
+    repo=ihp_repo,
 )

@@ -51,6 +51,11 @@ opdks_repo = RepoInfo(
     os.getenv("OPDKS_REPO_NAME", "open_pdks"),
 )
 
+ihp_repo = RepoInfo(
+    os.getenv("IHP_REPO_OWNER", "IHP-GmbH"),
+    os.getenv("IHP_REPO_OWNER", "IHP-Open-PDK"),
+)
+
 
 class GitHubSession(httpx.Client):
     class Token(object):
@@ -145,14 +150,16 @@ class GitHubSession(httpx.Client):
         return f"volare/{__version__}"
 
 
-def get_open_pdks_commit_date(
-    commit: str, session: Optional[GitHubSession] = None
+def get_commit_date(
+    commit: str,
+    repo: RepoInfo,
+    session: Optional[GitHubSession] = None,
 ) -> Optional[datetime]:
     if session is None:
         session = GitHubSession()
 
     try:
-        response = session.api(opdks_repo, f"/commits/{commit}", "get")
+        response = session.api(repo, f"/commits/{commit}", "get")
     except httpx.HTTPError:
         return None
 
