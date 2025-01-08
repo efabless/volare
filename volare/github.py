@@ -51,6 +51,11 @@ opdks_repo = RepoInfo(
     os.getenv("OPDKS_REPO_NAME", "open_pdks"),
 )
 
+ihp_repo = RepoInfo(
+    os.getenv("IHP_REPO_OWNER", "IHP-GmbH"),
+    os.getenv("IHP_REPO_OWNER", "IHP-Open-PDK"),
+)
+
 
 class GitHubSession(httpx.Client):
     class Token(object):

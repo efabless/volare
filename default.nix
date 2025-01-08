@@ -21,35 +21,38 @@
   pcpp,
   zstandard,
   truststore,
-  nix-gitignore,
+  poetry-core,
 }:
+buildPythonPackage {
+  pname = "volare";
+  version = (builtins.fromTOML (builtins.readFile ./pyproject.toml)).tool.poetry.version;
+  format = "pyproject";
 
-buildPythonPackage rec {
-  name = "volare";
-
-  version_file = builtins.readFile ./volare/__version__.py;
-  version_list = builtins.match ''.+''\n__version__ = "([^"]+)"''\n.+''$'' version_file;
-  version = builtins.head version_list;
-
-  src = nix-gitignore.gitignoreSourcePure ./.gitignore ./.;
-
+  src = ./.;
   doCheck = false;
 
-  propagatedBuildInputs = [
-    click
-    pyyaml
-    rich
-    httpx
-    pcpp
-    zstandard
-    truststore
-  ] ++ httpx.optional-dependencies.socks;
-  
-  meta = with lib; {
+  nativeBuildInputs = [
+    poetry-core
+  ];
+
+
+  dependencies =
+    [
+      click
+      pyyaml
+      rich
+      httpx
+      pcpp
+      zstandard
+      truststore
+    ]
+    ++ httpx.optional-dependencies.socks;
+
+  meta = {
     mainProgram = "volare";
     description = "Version manager and builder for open-source PDKs";
     homepage = "https://github.com/efabless/volare";
-    license = licenses.asl20;
-    platforms = platforms.darwin ++ platforms.linux;
+    license = lib.licenses.asl20;
+    platforms = lib.platforms.darwin ++ lib.platforms.linux;
   };
 }

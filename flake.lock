@@ -1,23 +1,42 @@
 {
   "nodes": {
+    "nix-eda": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1735039316,
+        "narHash": "sha256-T9NFsUbaukW97A0+oQFkgu7/KxAOl3A46Ce8gOGFmZY=",
+        "owner": "efabless",
+        "repo": "nix-eda",
+        "rev": "2bc60735f29c5050cb9740c43f614eac11d2b4ca",
+        "type": "github"
+      },
+      "original": {
+        "owner": "efabless",
+        "repo": "nix-eda",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
-        "narHash": "sha256-C36QmoJd5tdQ5R9MC1jM7fBkZW9zBUqbUCsgwS6j4QU=",
+        "lastModified": 1733120037,
+        "narHash": "sha256-En+gSoVJ3iQKPDU1FHrR6zIxSLXKjzKY+pnh9tt+Yts=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "c1be43e8e837b8dbee2b3665a007e761680f0c3d",
+        "rev": "f9f0d5c5380be0a599b1fb54641fa99af8281539",
         "type": "github"
       },
       "original": {
         "owner": "nixos",
-        "ref": "nixos-23.11",
+        "ref": "nixos-24.11",
         "repo": "nixpkgs",
         "type": "github"
       }
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "nix-eda": "nix-eda"
       }
     }
   },
