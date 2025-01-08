@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import subprocess
+from typing import Optional
 
 from rich.progress import Progress
 
@@ -86,10 +87,6 @@ class Repository(object):
 
         process.wait()
 
-        subprocess.check_output(
-            ["git", "submodule", "init"], stderr=subprocess.PIPE, cwd=self.path
-        )
-
     def pristine(self):
         subprocess.check_output(
             ["git", "clean", "-fdX"], cwd=self.path, stderr=subprocess.PIPE
@@ -135,9 +132,6 @@ class Repository(object):
         process.wait()
         if callback is not None:
             callback(100)
-        subprocess.check_output(
-            ["git", "submodule", "init"], stderr=subprocess.PIPE, cwd=self.path
-        )
 
     def checkout_commit(self, commit: str):
         subprocess.check_output(
@@ -159,22 +153,12 @@ class Repository(object):
             stderr=subprocess.PIPE,
         )
 
-    def init_submodule_if_not_exist(self, submodule: str, callback=None):
-        submodule_git_path = os.path.join(self.path, submodule, ".git")
-        if os.path.exists(submodule_git_path):
-            subprocess.check_output(
-                ["git", "submodule", "update", "--remote", submodule],
-                cwd=self.path,
-                stderr=subprocess.PIPE,
-            )
-            if callback is not None:
-                callback(100)
-        else:
-            self.init_submodule(submodule, callback)
-
-    def init_submodule(self, submodule: str, callback=None):
+    def init_submodule(self, submodule: Optional[str] = None, callback=None):
+        cmd = ["git", "submodule", "update", "--init", "--progress"]
+        if submodule is not None:
+            cmd.append(submodule)
         process = subprocess.Popen(
-            ["git", "submodule", "update", "--progress", submodule, submodule],
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=self.path,
@@ -231,6 +215,6 @@ class GitMultiClone(object):
         current_task = self.progress.add_task(
             f"Updating submodule {submodule}…", total=100
         )
-        repo.init_submodule_if_not_exist(
+        repo.init_submodule(
             submodule, lambda x: self.progress.update(current_task, completed=x)
         )

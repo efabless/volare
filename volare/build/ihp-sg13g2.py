@@ -47,8 +47,12 @@ def get_ihp(
                         ihp_repo.link,
                         version,
                     )
-                    repo_path = ihp_future.result().path
-
+                    repo = ihp_future.result()
+                    current_task = progress.add_task(
+                        "Updating submodules…", total=100
+                    )
+                    repo.init_submodule(callback=lambda x: progress.update(current_task, completed=x))
+                    repo_path = repo.path
             console.log(f"Done fetching {ihp_repo.name}.")
         else:
             console.log(f"Using IHP-Open-PDK at {repo_path} unaltered.")
