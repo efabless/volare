@@ -53,7 +53,7 @@ opdks_repo = RepoInfo(
 
 ihp_repo = RepoInfo(
     os.getenv("IHP_REPO_OWNER", "IHP-GmbH"),
-    os.getenv("IHP_REPO_OWNER", "IHP-Open-PDK"),
+    os.getenv("IHP_REPO_NAME", "IHP-Open-PDK"),
 )
 
 
