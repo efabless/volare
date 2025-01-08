@@ -27,7 +27,7 @@ from rich.progress import Progress
 
 from ..github import (
     GitHubSession,
-    get_open_pdks_commit_date,
+    get_commit_date,
     volare_repo,
 )
 from ..common import (
@@ -141,6 +141,8 @@ def push(
     push_libraries=None,
     session: Optional[GitHubSession] = None,
 ):
+    family = Family.by_name[pdk]
+
     if session is None:
         session = GitHubSession()
     if session.github_token is None:
@@ -149,7 +151,7 @@ def push(
     console = Console()
 
     if push_libraries is None or len(push_libraries) == 0:
-        push_libraries = Family.by_name[pdk].all_libraries
+        push_libraries = family.all_libraries
     library_list = set(push_libraries)
 
     version_object = Version(version, pdk)
@@ -199,9 +201,9 @@ def push(
     console.log("Starting upload…")
 
     body = f"{pdk} variants built using volare"
-    date = get_open_pdks_commit_date(version, session)
+    date = get_commit_date(version, family.repo, session)
     if date is not None:
-        body = f"{pdk} variants built using open_pdks {version} (released on {date_to_iso8601(date)})"
+        body = f"{pdk} variants (released on {date_to_iso8601(date)})"
 
     for tarball_path in final_tarballs:
         subprocess.check_call(

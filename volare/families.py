@@ -14,6 +14,8 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Dict, Optional, Set, ClassVar
 
+from .github import RepoInfo, opdks_repo, ihp_repo
+
 
 @dataclass
 class Family(object):
@@ -22,6 +24,7 @@ class Family(object):
     name: str
     variants: List[str]
     all_libraries: List[str]
+    repo: RepoInfo
     # lol no implicitly unwrapped optionals
     default_variant: str = None  # type: ignore
     default_includes: List[str] = None  # type: ignore
@@ -79,6 +82,7 @@ Family.by_name["sky130"] = Family(
         "sky130_ml_xx_hd",
         "sky130_sram_macros",
     ],
+    repo=opdks_repo,
 )
 Family.by_name["gf180mcu"] = Family(
     name="gf180mcu",
@@ -100,6 +104,7 @@ Family.by_name["gf180mcu"] = Family(
         "gf180mcu_fd_sc_mcu9t5v0",
         "gf180mcu_fd_ip_sram",
     ],
+    repo=opdks_repo,
 )
 Family.by_name["ihp-sg13g2"] = Family(
     name="ihp-sg13g2",
@@ -110,4 +115,5 @@ Family.by_name["ihp-sg13g2"] = Family(
         "sg13g2_sram",
         "sg13g2_stdcell",
     ],
+    repo=ihp_repo,
 )
