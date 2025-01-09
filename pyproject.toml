@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "volare"
-version = "0.20.3"
+version = "0.20.4"
 description = "An PDK builder/version manager for PDKs in the open_pdks format"
 authors = ["Efabless Corporation and Contributors <donn@efabless.com>"]
 readme = "Readme.md"

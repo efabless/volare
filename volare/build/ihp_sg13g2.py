@@ -48,10 +48,10 @@ def get_ihp(
                         version,
                     )
                     repo = ihp_future.result()
-                    current_task = progress.add_task(
-                        "Updating submodules…", total=100
+                    current_task = progress.add_task("Updating submodules…", total=100)
+                    repo.init_submodule(
+                        callback=lambda x: progress.update(current_task, completed=x)
                     )
-                    repo.init_submodule(callback=lambda x: progress.update(current_task, completed=x))
                     repo_path = repo.path
             console.log(f"Done fetching {ihp_repo.name}.")
         else:
@@ -68,22 +68,24 @@ def get_ihp(
 def build_ihp(build_directory, ihp_path):
     # """Build"""
     try:
-        shutil.rmtree(os.path.join(build_directory, "ihp-sg13g2"))
+        shutil.rmtree(os.path.join(build_directory, "ihp_sg13g2"))
     except FileNotFoundError:
         pass
     shutil.copytree(
         os.path.join(ihp_path, "ihp-sg13g2"),
-        os.path.join(build_directory, "ihp-sg13g2"),
-        ignore=lambda dir, files: files if ".git" in os.path.split(dir) else [".git", ".DS_Store"]
+        os.path.join(build_directory, "ihp_sg13g2"),
+        ignore=lambda dir, files: (
+            files if ".git" in os.path.split(dir) else [".git", ".DS_Store"]
+        ),
     )
 
 
 def install_ihp(build_directory, pdk_root, version):
     console = Console()
     with console.status("Adding build to list of installed versions…"):
-        ihp_sg13g2_family = Family.by_name["ihp-sg13g2"]
+        ihp_sg13g2_family = Family.by_name["ihp_sg13g2"]
 
-        version_directory = Version(version, "ihp-sg13g2").get_dir(pdk_root)
+        version_directory = Version(version, "ihp_sg13g2").get_dir(pdk_root)
         if (
             os.path.exists(version_directory)
             and len(os.listdir(version_directory)) != 0
@@ -92,7 +94,7 @@ def install_ihp(build_directory, pdk_root, version):
             it = 0
             while os.path.exists(backup_path) and len(os.listdir(backup_path)) != 0:
                 it += 1
-                backup_path = Version(f"{version}.bk{it}", "ihp-sg13g2").get_dir(
+                backup_path = Version(f"{version}.bk{it}", "ihp_sg13g2").get_dir(
                     pdk_root
                 )
             console.log(
@@ -130,7 +132,7 @@ def build(
         using_repos = {}
 
     build_directory = os.path.join(
-        get_volare_dir(pdk_root, "ihp-sg13g2"), "build", version
+        get_volare_dir(pdk_root, "ihp_sg13g2"), "build", version
     )
     timestamp = datetime.now().strftime("build_ihp-sg13g2-%Y-%m-%d-%H-%M-%S")
     log_dir = os.path.join(build_directory, "logs", timestamp)
