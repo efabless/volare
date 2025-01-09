@@ -130,6 +130,7 @@ class GitHubSession(httpx.Client):
         }
         if github_token is not None:
             raw_headers["Authorization"] = f"Bearer {github_token}"
+            raw_headers["Accept"] = "application/vnd.github+json"
         self.headers = httpx.Headers(raw_headers)
 
     def api(

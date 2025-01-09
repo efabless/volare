@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-import uuid
 import pathlib
 import tarfile
 import tempfile
 import importlib
-import subprocess
 from typing import Optional, List, Dict
 
 import click
+import httpx
 import zstandard as zstd
 from rich.console import Console
 from rich.progress import Progress
@@ -159,8 +158,8 @@ def push(
     if not os.path.isdir(version_directory):
         raise FileNotFoundError(f"Version {version} not found.")
 
-    tempdir = tempfile.gettempdir()
-    tarball_directory = os.path.join(tempdir, "volare", f"{uuid.uuid4()}", version)
+    tempdir = tempfile.TemporaryDirectory("volare")
+    tarball_directory = tempdir.name
     mkdirp(tarball_directory)
 
     final_tarballs = []
@@ -191,13 +190,11 @@ def push(
                         progress.update(task, completed=i + 1)
                         path_in_tarball = os.path.relpath(file, version_directory)
                         tf.add(file, arcname=path_in_tarball)
-            console.log(f"\nCompressed to {tarball_path}.")
             progress.remove_task(task)
             final_tarballs.append(tarball_path)
 
     tag = f"{pdk}-{version}"
 
-    # If someone wants to rewrite this to not use ghr, please, by all means.
     console.log("Starting upload…")
 
     body = f"{pdk} variants built using volare"
@@ -205,28 +202,55 @@ def push(
     if date is not None:
         body = f"{pdk} variants (released on {date_to_iso8601(date)})"
 
-    for tarball_path in final_tarballs:
-        subprocess.check_call(
-            [
-                "ghr",
-                "-owner",
-                owner,
-                "-repository",
-                repository,
-                "-token",
-                session.github_token,
-                "-body",
-                body,
-                "-commitish",
-                "releases",
-                "-replace",
-            ]
-            + (["-prerelease"] if pre else [])
-            + [
-                tag,
-                tarball_path,
-            ]
-        )
+    release_url = f"{volare_repo.api}/releases"
+    response = session.post(
+        release_url,
+        json={
+            "target_commitish": "releases",
+            "tag_name": tag,
+            "name": tag,
+            "body": body,
+            "prerelease": pre,
+            "draft": False,
+        },
+    )
+
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 422:
+            raise RuntimeError(
+                f"HTTP response 422: release with tag {tag} might already exist"
+            )
+        else:
+            raise exc from None
+    release = response.json()
+    upload_url = release["upload_url"].split("{")[0]
+
+    with Progress() as progress:
+        # Upload assets to the release
+        for tarball_path in final_tarballs:
+            filename = tarball_path.split("/")[-1]
+            size = os.path.getsize(tarball_path)
+            with open(tarball_path, "rb") as f:
+                tid = progress.add_task(f"Uploading {filename}…", total=size)
+
+                def stream():
+                    nonlocal f, tid, progress
+                    while data := f.read(4096):
+                        progress.advance(tid, len(data))
+                        yield data
+
+                upload_params = {"name": filename}
+                upload_response = session.post(
+                    upload_url,
+                    params=upload_params,
+                    headers={"Content-Type": "application/octet-stream"},
+                    content=stream(),
+                )
+                upload_response.raise_for_status()
+                progress.update(tid, total=size)
+
     console.log("Done.")
 
 
@@ -246,8 +270,6 @@ def push_cmd(
 ):
     """
     For maintainers: Package and release a build to the public.
-
-    Requires ghr: github.com/tcnksm/ghr
 
     Parameters: <version> (required)
     """
