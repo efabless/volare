@@ -68,12 +68,12 @@ def get_ihp(
 def build_ihp(build_directory, ihp_path):
     # """Build"""
     try:
-        shutil.rmtree(os.path.join(build_directory, "ihp_sg13g2"))
+        shutil.rmtree(os.path.join(build_directory, "ihp-sg13g2"))
     except FileNotFoundError:
         pass
     shutil.copytree(
         os.path.join(ihp_path, "ihp-sg13g2"),
-        os.path.join(build_directory, "ihp_sg13g2"),
+        os.path.join(build_directory, "ihp-sg13g2"),
         ignore=lambda dir, files: (
             files if ".git" in os.path.split(dir) else [".git", ".DS_Store"]
         ),

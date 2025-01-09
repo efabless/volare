@@ -108,7 +108,7 @@ Family.by_name["gf180mcu"] = Family(
 )
 Family.by_name["ihp_sg13g2"] = Family(
     name="ihp_sg13g2",
-    variants=["ihp_sg13g2"],
+    variants=["ihp-sg13g2"],
     all_libraries=[
         "sg13g2_io",
         "sg13g2_pr",
