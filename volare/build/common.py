@@ -79,7 +79,7 @@ def patch_open_pdks(at_path: str):
     download_script_ok = is_ancestor(
         "ebffedd16788db327af050ac01c3fb1558ebffd1"
     )  # download script fix
-    if download_script_ok:
+    if not download_script_ok:
         print("Replacing download.sh…")
         session = GitHubSession()
         r = session.get(
